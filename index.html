@@ -887,17 +887,26 @@ function pickBank() {
 }
 
 /* ---------- Mic + recognition ---------- */
-let micStream = null, micTried = false;
-// Asked once per page load; the stream is kept and reused by every later answer and dialog.
-async function ensureMic() {
+let micStream = null, micDenied = false, micError = "";
+// iPad/iPhone Safari shares one audio session between speech and the mic: speaking a line can
+// silently end an open mic stream. There the mic is opened only for each answer and closed after it.
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const micLive = () => !!micStream && micStream.getAudioTracks().some(t => t.readyState === "live");
+// The browser asks once per page load; later calls reuse that permission without asking again.
+async function getMic() {
   if (!S.record && !S.transcribe) return null;
-  if (micStream) return micStream;
-  if (micTried) return null;
-  micTried = true;
-  try { micStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-  catch { micStream = null; }
+  if (micLive()) return micStream;
+  if (micDenied || !navigator.mediaDevices?.getUserMedia) return null;
+  try { micStream = await navigator.mediaDevices.getUserMedia({ audio: true }); micError = ""; }
+  catch (e) { micStream = null; micError = e?.name || "fel"; if (e?.name === "NotAllowedError" || e?.name === "SecurityError") micDenied = true; }
   return micStream;
 }
+function releaseMic() {
+  if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+}
+const REC_TYPE = window.MediaRecorder && MediaRecorder.isTypeSupported
+  ? ["audio/mp4", "audio/webm;codecs=opus", "audio/webm"].find(t => MediaRecorder.isTypeSupported(t)) || ""
+  : "";
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 // One recognition session per dialog (each start can trigger a mic prompt on file:// pages).
@@ -927,7 +936,16 @@ function stopRecognition() {
 
 /* ---------- Run engine ---------- */
 let runId = 0, skipFn = null, current = null;
-const R = { recordings: [], transcripts: [] };
+const R = { recordings: [], transcripts: [], errors: [] };
+function recordingCell(i) {
+  if (R.recordings[i]) return `<audio controls preload="metadata" src="${R.recordings[i]}"></audio>`;
+  return `<span class="muted small">Ingen inspelning${R.errors[i] ? ` (${esc(R.errors[i])})` : ""}</span>`;
+}
+// A recording can finish after the review is already on screen (Safari is slow to save); fill it in then.
+function refreshRecording(i) {
+  const el = document.getElementById("rec-" + i);
+  if (el) el.innerHTML = recordingCell(i);
+}
 
 // `seconds` may be a function, so the answer window follows live changes to the answer time.
 function countdown(seconds) {
@@ -971,35 +989,45 @@ function renderTaskSheet(d) {
 async function answerWindow(i, alive) {
   setPhase("answer", `<span class="dot"></span> Din tur – tala nu`);
   markCue(i, "answer");
-  beep(880, 160);
   let rec = null, recDone = Promise.resolve();
-  if (micStream && window.MediaRecorder) {
+  const stream = S.record ? await getMic() : null;
+  if (S.record && !stream) R.errors[i] = micDenied ? "mikrofonen nekad" : "mikrofonen inte tillgänglig" + (micError ? ": " + micError : "");
+  else if (S.record && !window.MediaRecorder) R.errors[i] = "webbläsaren kan inte spela in";
+  if (stream && window.MediaRecorder) {
     try {
       const chunks = [];
-      rec = new MediaRecorder(micStream);
+      rec = REC_TYPE ? new MediaRecorder(stream, { mimeType: REC_TYPE }) : new MediaRecorder(stream);
       recDone = new Promise(res => {
         rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
-        rec.onstop = () => { if (chunks.length) R.recordings[i] = URL.createObjectURL(new Blob(chunks, { type: rec.mimeType || "audio/webm" })); res(); };
+        rec.onerror = e => { R.errors[i] = "inspelningsfel: " + (e.error?.name || "okänt"); };
+        rec.onstop = () => {
+          if (chunks.length) R.recordings[i] = URL.createObjectURL(new Blob(chunks, { type: rec.mimeType || REC_TYPE || "audio/mp4" }));
+          else if (!R.errors[i]) R.errors[i] = "inget ljud fångades";
+          refreshRecording(i); res();
+        };
       });
-      rec.start();
-    } catch { rec = null; }
+      rec.start(1000); // deliver audio every second so a cut-off stream still leaves something
+    } catch (e) { rec = null; R.errors[i] = "inspelningen startade inte: " + (e?.name || "fel"); }
   }
+  beep(880, 160); // after the recorder is running, so the start of the answer is captured
   startRecognition();
   recogTurn = i;
   await countdown(() => S.answer);
   // Let the last words arrive before closing the window for this turn.
   setTimeout(() => { if (recogTurn === i) recogTurn = -1; }, 1200);
-  if (rec && rec.state !== "inactive") { rec.stop(); }
-  await Promise.race([recDone, new Promise(r => setTimeout(r, 1500))]);
+  if (rec && rec.state !== "inactive") { try { rec.stop(); } catch {} }
+  await Promise.race([recDone, new Promise(r => setTimeout(r, 4000))]);
+  if (IS_IOS && !S.transcribe) releaseMic(); // free the audio session so the next line plays at full volume
   if (alive()) beep(520, 140);
 }
 
 async function runDialog(d) {
   const id = ++runId, alive = () => id === runId;
   stopRecognition();
-  current = d; R.recordings = []; R.transcripts = [];
+  current = d; R.recordings = []; R.transcripts = []; R.errors = [];
   renderTaskSheet(d);
-  const mic = await ensureMic();
+  const mic = await getMic(); // ask for permission now, not in the middle of the dialog
+  if (mic && IS_IOS && !S.transcribe) releaseMic();
   const mn = $("#mic-note");
   if (S.record && !mic) { mn.textContent = "Mikrofonen är inte tillgänglig här, så svaren spelas inte in. Svara högt ändå inom svarstiden."; mn.hidden = false; }
   else mn.hidden = true;
@@ -1049,8 +1077,7 @@ function renderReview(d) {
     <div class="turn">
       ${t.line ? `<div class="line partner"><span class="who">Partner</span><span class="txt">${esc(t.line)}</span><button class="iconbtn" data-say="${i}" aria-label="Lyssna igen">${PLAY}</button></div>` : ""}
       <div class="line task"><span class="who">Uppgift ${i + 1}</span><span class="txt">${esc(t.task)}${t.task_en ? `<span class="en">${esc(t.task_en)}</span>` : ""}</span><span></span></div>
-      <div class="line mine"><span class="who">Du</span><span class="txt">${
-        R.recordings[i] ? `<audio controls src="${R.recordings[i]}"></audio>` : `<span class="muted small">Ingen inspelning</span>`}
+      <div class="line mine"><span class="who">Du</span><span class="txt"><span id="rec-${i}">${recordingCell(i)}</span>
         <span class="small muted" id="tr-${i}" style="display:block">${R.transcripts[i] ? "”" + esc(R.transcripts[i]) + "”" : ""}</span></span><span></span></div>
       <div class="line model"><span class="who">Exempel</span><span class="txt">${esc(t.example || "")}</span>${t.example ? `<button class="iconbtn" data-ex="${i}" aria-label="Lyssna på exemplet">${PLAY}</button>` : "<span></span>"}</div>
     </div>`).join("") + (d.closing ? `<div class="turn"><div class="line partner"><span class="who">Partner</span><span class="txt">${esc(d.closing)}</span><button class="iconbtn" data-close aria-label="Lyssna igen">${PLAY}</button></div></div>` : "");
