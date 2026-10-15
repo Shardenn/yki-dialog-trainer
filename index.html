@@ -1,0 +1,1102 @@
+<title>YKI Dialog Trainer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: one centred exam sheet (max 720px); a sticky timer strip appears while a dialog runs. */
+:root {
+  --bg: #e9edf1;
+  --sheet: #ffffff;
+  --ink: #16202a;
+  --muted: #5b6774;
+  --line: #d3dae1;
+  --accent: #0a5a87;
+  --accent-ink: #ffffff;
+  --accent-soft: #e2eef6;
+  --signal: #b98500;
+  --signal-soft: #fbf1d6;
+  --rec: #c4362c;
+  --ok: #2d7a4b;
+  --f-display: "Familjen Grotesk", "Segoe UI", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e141a; --sheet: #161f28; --ink: #e5eaef; --muted: #93a0ad; --line: #2a3643;
+  --accent: #62b2e3; --accent-ink: #08202f; --accent-soft: #15303f;
+  --signal: #f0c03a; --signal-soft: #3a3014; --rec: #ff6a5c; --ok: #6fcf94; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0e141a; --sheet: #161f28; --ink: #e5eaef; --muted: #93a0ad; --line: #2a3643;
+  --accent: #62b2e3; --accent-ink: #08202f; --accent-soft: #15303f;
+  --signal: #f0c03a; --signal-soft: #3a3014; --rec: #ff6a5c; --ok: #6fcf94; color-scheme: dark }
+
+html, body { background: var(--bg); color: var(--ink); }
+body { font: 15px/1.55 var(--f-body); padding-inline: 16px; padding-block: 20px 48px; }
+.wrap { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: 1.9rem; }
+h2 { font-size: 1.35rem; }
+h3 { font-size: 1.05rem; }
+p { margin: 0; }
+.eyebrow { font-size: .72rem; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.muted { color: var(--muted); }
+.small { font-size: .85rem; }
+
+header.top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.brand { font-family: var(--f-display); font-weight: 700; font-size: 1.05rem; }
+.brand span { color: var(--accent); }
+
+.sheet { background: var(--sheet); border: 1px solid var(--line); border-radius: 10px; padding: 22px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+.steps { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: .9rem; color: var(--muted); }
+.steps b { color: var(--ink); font-weight: 600; }
+.steps i { font-style: normal; opacity: .6; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
+label.field { display: flex; flex-direction: column; gap: 5px; font-size: .85rem; color: var(--muted); font-weight: 500; min-width: 0; }
+select, input[type=range] { width: 100%; }
+select { font: inherit; color: var(--ink); background: var(--sheet); border: 1px solid var(--line); border-radius: 6px; padding: 7px 8px; }
+.checks { display: flex; flex-direction: column; gap: 8px; }
+.checks label { display: flex; gap: 8px; align-items: flex-start; font-size: .92rem; }
+.checks input { margin-top: 4px; accent-color: var(--accent); }
+
+button { font: inherit; cursor: pointer; border-radius: 7px; border: 1px solid var(--line); background: var(--sheet); color: var(--ink); padding: 8px 14px; font-weight: 500; }
+button:hover { border-color: var(--accent); }
+button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; padding: 12px 22px; font-size: 1.02rem; }
+button.primary:hover { filter: brightness(1.08); }
+button.ghost { border-color: transparent; background: transparent; color: var(--muted); }
+button.ghost:hover { color: var(--ink); }
+button:disabled { opacity: .5; cursor: default; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.note { font-size: .85rem; padding: 10px 12px; border-radius: 7px; background: var(--signal-soft); color: var(--ink); }
+.note.info { background: var(--accent-soft); }
+
+/* Run screen */
+.strip { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 2; background: var(--sheet); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; display: flex; align-items: center; gap: 16px; }
+.strip .phase { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.phase-label { font-family: var(--f-display); font-weight: 700; font-size: 1.15rem; display: flex; align-items: center; gap: 9px; }
+.clock { font-family: var(--f-mono); font-size: 2rem; font-variant-numeric: tabular-nums; min-width: 4.2ch; text-align: right; }
+.bar { height: 5px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.bar > div { height: 100%; width: 0; background: var(--accent); transition: width .1s linear; }
+.strip.answer { border-color: var(--signal); background: var(--signal-soft); }
+.strip.answer .bar > div { background: var(--signal); }
+.dot { width: 11px; height: 11px; border-radius: 50%; background: var(--rec); flex: none; animation: pulse 1.1s ease-in-out infinite; }
+.wave { display: inline-flex; gap: 3px; align-items: flex-end; height: 16px; }
+.wave span { width: 3px; background: var(--accent); border-radius: 2px; animation: wave 0.9s ease-in-out infinite; }
+.wave span:nth-child(2) { animation-delay: .15s } .wave span:nth-child(3) { animation-delay: .3s } .wave span:nth-child(4) { animation-delay: .45s }
+@keyframes pulse { 50% { opacity: .3 } }
+@keyframes wave { 0%,100% { height: 4px } 50% { height: 16px } }
+@media (prefers-reduced-motion: reduce) { .dot, .wave span { animation: none; } .wave span { height: 10px; } }
+
+.situation { font-size: 1.05rem; line-height: 1.6; }
+.en { display: block; font-size: .85rem; color: var(--muted); margin-top: 2px; }
+ol.cues { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; counter-reset: cue; }
+ol.cues li { counter-increment: cue; display: grid; grid-template-columns: 2.2rem 1fr; gap: 6px; padding: 10px 12px; border-radius: 7px; border: 1px solid transparent; }
+ol.cues li::before { content: counter(cue) "."; font-family: var(--f-mono); color: var(--muted); padding-top: 1px; }
+ol.cues li.now { border-color: var(--accent); background: var(--accent-soft); }
+ol.cues li.now.answering { border-color: var(--signal); background: var(--signal-soft); }
+ol.cues li.done { color: var(--muted); }
+ol.cues li .cue { font-weight: 500; min-width: 0; }
+ol.cues li.start .cue::after { content: " (du börjar)"; color: var(--muted); font-weight: 400; }
+.kbd { font-family: var(--f-mono); font-size: .8rem; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; }
+
+/* Review */
+.turn { display: flex; flex-direction: column; gap: 8px; padding-block: 14px; border-top: 1px solid var(--line); min-width: 0; }
+.turn:first-child { border-top: 0; padding-top: 0; }
+.who { font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.line { display: grid; grid-template-columns: 5.5rem 1fr auto; gap: 10px; align-items: start; }
+.line .txt { min-width: 0; }
+.partner .txt { font-size: 1.02rem; }
+.task .txt { font-weight: 500; color: var(--accent); }
+.mine audio { width: 100%; max-width: 360px; height: 36px; }
+.model .txt { font-style: italic; }
+.iconbtn { padding: 4px 8px; display: inline-flex; align-items: center; gap: 4px; font-size: .8rem; color: var(--muted); }
+.iconbtn svg { width: 15px; height: 15px; fill: currentColor; }
+@media (max-width: 520px) {
+  .line { grid-template-columns: 1fr auto; }
+  .line .who { grid-column: 1 / -1; }
+  .clock { font-size: 1.6rem; }
+  .sheet { padding: 16px; }
+}
+.tweak { display: inline-flex; align-items: center; gap: 6px; font-size: .85rem; color: var(--muted); }
+.mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums; color: var(--ink); min-width: 3.5ch; text-align: center; }
+.stats { font-family: var(--f-mono); font-size: .8rem; color: var(--muted); }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">YKI <span>Dialog</span> Trainer</div>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <!-- SETUP -->
+  <section id="scr-setup" class="sheet">
+    <div>
+      <p class="eyebrow">Muntlig färdighet · Mellannivå (nivå 3–4)</p>
+      <h1>Dialoger</h1>
+    </div>
+    <p>Varje gång skapas en ny dialog. Du ser bara situationen och instruktionerna, precis som på provet. Dialogtexten visas först när du är klar.</p>
+    <div class="steps">
+      <span><b>Läs</b> uppgiften</span><i>→</i>
+      <span><b>Lyssna</b> på repliken</span><i>→</i>
+      <span><b>Svara</b> inom svarstiden</span><i>→</i>
+      <span><b>Granska</b> hela dialogen</span>
+    </div>
+
+    <div class="grid">
+      <label class="field">Ämne
+        <select id="topic">
+          <option value="">Slumpa</option>
+          <option>vardag och grannar</option>
+          <option>arbete och kolleger</option>
+          <option>hälsa och vård</option>
+          <option>service, köp och reklamation</option>
+          <option>resor och trafik</option>
+          <option>boende</option>
+          <option>fritid och vänner</option>
+          <option>studier och kurser</option>
+          <option>myndigheter och ärenden</option>
+          <option>familj och fester</option>
+        </select>
+      </label>
+      <label class="field">Lästid
+        <select id="prep"><option value="30">30 sekunder</option><option value="45">45 sekunder</option><option value="60">60 sekunder</option></select>
+      </label>
+      <label class="field">Svarstid <span id="answer-val" class="muted"></span>
+        <input type="range" id="answer" min="5" max="60" step="5" value="15">
+      </label>
+      <label class="field">Dialoger
+        <select id="source"><option value="claude">Nya från Claude</option><option value="bank">Färdiga dialoger</option></select>
+      </label>
+      <label class="field">Röst
+        <select id="voice"><option value="">Svensk standardröst</option></select>
+      </label>
+      <label class="field">Taltempo <span id="rate-val" class="muted"></span>
+        <input type="range" id="rate" min="0.7" max="1.2" step="0.05" value="0.95">
+      </label>
+    </div>
+
+    <div class="checks">
+      <label><input type="checkbox" id="record" checked> Spela in mina svar (om mikrofonen är tillgänglig)</label>
+      <label><input type="checkbox" id="transcribe"> <span>Skriv ut vad jag sa (taligenkänning i Chrome/Edge)<span class="en">When the page is opened as a file, the browser may ask for the microphone once more per dialog.</span></span></label>
+      <label><input type="checkbox" id="readsit"> Läs upp situationen innan dialogen börjar</label>
+      <label><input type="checkbox" id="showen"> Visa instruktionerna även på engelska</label>
+    </div>
+
+    <div id="voice-note" class="note" hidden></div>
+
+    <div class="row">
+      <button class="primary" id="btn-start">Starta ny dialog</button>
+      <button id="btn-testvoice">Testa rösten</button>
+    </div>
+    <p class="small muted" id="source-note">Kontrollerar om nya dialoger kan skapas…</p>
+  </section>
+
+  <!-- GENERATING -->
+  <section id="scr-gen" class="sheet" hidden>
+    <p class="eyebrow">Förbereder</p>
+    <h2>En ny dialog skrivs…</h2>
+    <p class="muted" id="gen-progress">Väntar på svar. Det tar oftast 10–40 sekunder.</p>
+    <div class="row"><button id="btn-gen-bank">Använd en färdig dialog i stället</button><button class="ghost" id="btn-gen-cancel">Avbryt</button></div>
+  </section>
+
+  <!-- RUN -->
+  <section id="scr-run" hidden>
+    <div class="wrap">
+      <div class="strip" id="strip">
+        <div class="phase">
+          <div class="phase-label" id="phase-label">Läs uppgiften</div>
+          <div class="bar"><div id="bar"></div></div>
+        </div>
+        <div class="clock" id="clock">0:30</div>
+      </div>
+      <div class="sheet">
+        <div>
+          <p class="eyebrow">Situation</p>
+          <p class="situation" id="run-sit"></p>
+        </div>
+        <div>
+          <p class="eyebrow" style="margin-bottom:6px">Vad du ska göra</p>
+          <ol class="cues" id="run-cues"></ol>
+        </div>
+        <div class="row">
+          <button id="btn-skip">Fortsätt nu</button>
+          <button class="ghost" id="btn-abort">Avbryt dialogen</button>
+          <span class="tweak" aria-label="Ändra svarstiden">Svarstid
+            <button class="iconbtn" id="ans-minus" aria-label="5 sekunder kortare">−5</button>
+            <span id="ans-live" class="mono">15 s</span>
+            <button class="iconbtn" id="ans-plus" aria-label="5 sekunder längre">+5</button></span>
+          <span class="small muted"><span class="kbd">Mellanslag</span> = fortsätt</span>
+        </div>
+        <div id="mic-note" class="note" hidden></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- REVIEW -->
+  <section id="scr-review" class="sheet" hidden>
+    <div>
+      <p class="eyebrow">Hela dialogen</p>
+      <h2 id="rev-title"></h2>
+    </div>
+    <p class="situation" id="rev-sit"></p>
+    <div id="rev-turns"></div>
+    <div class="row">
+      <button class="primary" id="btn-new">Ny dialog</button>
+      <button id="btn-again">Öva samma dialog igen</button>
+      <button class="ghost" id="btn-copy">Kopiera texten</button>
+    </div>
+    <p class="small muted" id="rev-note"></p>
+  </section>
+</div>
+
+<script>
+/* ---------- Built-in dialogs (used when Claude is not available) ---------- */
+const BANK = [
+{title:"Grannen ska flytta", situation:"Din granne Maria ringer dig. Hon ska flytta nästa helg och behöver hjälp.", situation_en:"Your neighbour Maria calls you. She is moving next weekend and needs help.",
+ turns:[
+ {line:"Hej, det är Maria här, din granne. Har du ett ögonblick?", task:"Svara och fråga vad hon vill.", task_en:"Answer and ask what she wants.", example:"Hej Maria! Javisst, jag har tid. Vad gäller det?"},
+ {line:"Jo, jag ska flytta till en ny lägenhet nästa lördag. Skulle du kunna hjälpa mig att bära möbler?", task:"Svara nekande och förklara varför.", task_en:"Say no and explain why.", example:"Tyvärr kan jag inte på lördag. Jag ska hälsa på min syster i Tammerfors hela helgen."},
+ {line:"Åh, vad synd. Känner du kanske någon annan som kunde hjälpa till?", task:"Ge ett förslag.", task_en:"Make a suggestion.", example:"Du kunde fråga Jonas på tredje våningen, han har en stor bil. Annars kan du anlita en flyttfirma."},
+ {line:"Bra idé. En sak till: jag har så många växter. Kan jag lämna dem hos dig en vecka?", task:"Svara jakande och fråga om detaljer.", task_en:"Say yes and ask for details.", example:"Ja, absolut. Hur många är det, och hur ofta ska de vattnas?"},
+ {line:"Ungefär tio stycken. Det räcker att vattna dem två gånger i veckan. Kan jag komma med dem på fredag kväll?", task:"Föreslå en annan tid.", task_en:"Suggest another time.", example:"Fredag kväll passar inte så bra, jag kommer hem sent. Kunde du komma på torsdag efter sex i stället?"},
+ {line:"Torsdag går bra. Tack så hemskt mycket, du är en ängel!", task:"Avsluta samtalet och önska lycka till med flytten.", task_en:"End the call and wish her luck with the move.", example:"Ingen orsak! Lycka till med flytten, hoppas du trivs i den nya lägenheten."}],
+ closing:"Tack, hej då!"},
+{title:"Tid på hälsocentralen", situation:"Du ringer till hälsocentralen för att boka tid. Du har haft ont i ryggen.", situation_en:"You call the health centre to book an appointment. You have had back pain.",
+ turns:[
+ {line:"Hälsocentralen, det är Anna. Hur kan jag hjälpa dig?", task:"Berätta varför du ringer.", task_en:"Say why you are calling.", example:"Hej, jag skulle vilja boka en tid hos läkaren. Jag har haft ont i ryggen i ungefär en vecka."},
+ {line:"Jaha. Hur kraftig är smärtan? Kan du arbeta som vanligt?", task:"Beskriv dina symtom.", task_en:"Describe your symptoms.", example:"Det gör mest ont på morgonen, och jag har svårt att sitta länge vid datorn. Jag jobbar, men det är jobbigt."},
+ {line:"Har du tagit någon medicin för smärtan?", task:"Svara.", task_en:"Answer.", example:"Ja, jag har tagit värktabletter några gånger, men de hjälper bara en kort stund."},
+ {line:"Okej. Vi har en ledig tid i morgon klockan åtta. Passar det?", task:"Svara nekande och föreslå en annan tid.", task_en:"Say no and suggest another time.", example:"Tyvärr, klockan åtta har jag ett viktigt möte. Finns det något på eftermiddagen, efter tre?"},
+ {line:"Det finns en tid på torsdag klockan halv fyra hos doktor Lindqvist.", task:"Ta emot tiden och fråga vad du ska ta med dig.", task_en:"Accept the time and ask what to bring.", example:"Det passar bra, jag tar den. Behöver jag ta med mig något, till exempel FPA-kortet?"},
+ {line:"Ta med ditt FPA-kort och en lista på mediciner du använder. Var det något annat?", task:"Tacka och avsluta samtalet.", task_en:"Thank her and end the call.", example:"Nej, det var allt. Tack för hjälpen, hej då!"}],
+ closing:"Varsågod, krya på dig!"},
+{title:"Avskedsfest för en kollega", situation:"Din arbetskamrat Peter vill planera en avskedsfest för en kollega som går i pension.", situation_en:"Your colleague Peter wants to plan a farewell party for a colleague who is retiring.",
+ turns:[
+ {line:"Hej! Har du hört att Leena går i pension i slutet av månaden?", task:"Svara och visa att du är förvånad.", task_en:"Answer and show you are surprised.", example:"Nej, verkligen? Det visste jag inte! Hon har ju jobbat här så länge."},
+ {line:"Ja, i tjugofem år. Jag tänkte att vi kunde ordna en liten fest för henne. Vad tycker du?", task:"Håll med och föreslå var festen kunde vara.", task_en:"Agree and suggest where the party could be.", example:"Vilken bra idé! Vi kunde ha den i personalrummet, eller på restaurangen här bredvid."},
+ {line:"Restaurangen låter trevligt. Men vad ska vi köpa i present?", task:"Föreslå en present och motivera.", task_en:"Suggest a present and give a reason.", example:"Hon tycker om att jobba i trädgården. Vi kunde köpa ett presentkort till en trädgårdsbutik."},
+ {line:"Bra! Kan du samla in pengar av alla på avdelningen?", task:"Svara nekande och förklara varför.", task_en:"Say no and explain why.", example:"Tyvärr hinner jag inte, jag är på kurs hela nästa vecka. Men jag kan skicka ett mejl till alla."},
+ {line:"Okej, då samlar jag in pengarna. Vilken dag tror du passar bäst för festen?", task:"Svara och motivera ditt val.", task_en:"Answer and justify your choice.", example:"Kanske fredag eftermiddag, för då har de flesta mindre att göra och kan stanna lite längre."},
+ {line:"Jag bokar bord. Ska vi hålla det hemligt för Leena?", task:"Säg vad du tycker.", task_en:"Give your opinion.", example:"Ja, det tycker jag. Det blir roligare om det är en överraskning."}],
+ closing:"Toppen, då gör vi så!"},
+{title:"Kaffebryggaren är trasig", situation:"Du köpte en kaffebryggare för en vecka sedan, men den fungerar inte. Du går tillbaka till butiken.", situation_en:"You bought a coffee maker a week ago but it doesn't work. You go back to the shop.",
+ turns:[
+ {line:"Hej, vad kan jag hjälpa till med?", task:"Förklara ditt problem.", task_en:"Explain your problem.", example:"Hej, jag köpte den här kaffebryggaren förra veckan, men den har slutat fungera. Den blir inte varm alls."},
+ {line:"Det var tråkigt att höra. Har du kvittot med dig?", task:"Svara nekande och förklara.", task_en:"Say no and explain.", example:"Tyvärr inte, jag har kastat det av misstag. Men jag betalade med kort, så köpet syns på mitt kontoutdrag."},
+ {line:"Det går bra, vi kan kontrollera köpet. Vill du ha en ny bryggare eller pengarna tillbaka?", task:"Säg vad du vill och motivera.", task_en:"Say what you want and why.", example:"Jag vill helst ha pengarna tillbaka, för jag tror att jag köper en annan modell i stället."},
+ {line:"Jag förstår. Men utan kvitto kan vi tyvärr bara ge ett tillgodokvitto, inte pengar.", task:"Säg att du är missnöjd.", task_en:"Say you are dissatisfied.", example:"Det tycker jag inte är rättvist. Det är ju inte mitt fel att produkten är trasig."},
+ {line:"Jag förstår dig. Jag kan fråga min chef om vi kan göra ett undantag.", task:"Tacka och be honom göra det.", task_en:"Thank him and ask him to do it.", example:"Tack, det vore snällt. Jag väntar gärna här medan du frågar."},
+ {line:"Min chef säger att det går bra. Du får pengarna tillbaka på kortet.", task:"Tacka och avsluta.", task_en:"Thank him and finish.", example:"Vad bra, tack så mycket för hjälpen! Ha en bra dag."}],
+ closing:"Detsamma, hej hej!"},
+{title:"Bio på lördag", situation:"Din vän Sara ringer och vill göra något tillsammans i helgen.", situation_en:"Your friend Sara calls and wants to do something together at the weekend.",
+ turns:[
+ {line:"Hej! Vad gör du i helgen?", task:"Svara och berätta om dina planer.", task_en:"Answer and tell about your plans.", example:"Hej! På lördag förmiddag ska jag städa, men annars har jag inga särskilda planer."},
+ {line:"Vad bra! Ska vi gå på bio på lördag kväll? Det går en ny svensk film.", task:"Svara positivt och fråga mer om filmen.", task_en:"Answer positively and ask more about the film.", example:"Gärna! Vad handlar filmen om?"},
+ {line:"Det är en komedi om en familj som flyttar ut på landet. Den har fått bra recensioner.", task:"Föreslå att ni gör något före filmen.", task_en:"Suggest doing something before the film.", example:"Låter kul. Ska vi äta något före filmen? Det finns en ny pizzeria nära biografen."},
+ {line:"Bra idé! Men jag är lite pank just nu. Är pizzerian dyr?", task:"Svara och lugna din vän.", task_en:"Answer and reassure your friend.", example:"Nej, inte alls. En pizza kostar ungefär tolv euro, och jag kan bjuda på drickan."},
+ {line:"Vad snällt! Hur ska vi ta oss dit, ska vi ta bussen?", task:"Föreslå något annat.", task_en:"Suggest something else.", example:"Jag kan hämta dig med bilen, så slipper vi vänta på bussen i kylan."},
+ {line:"Perfekt. Vilken tid kommer du?", task:"Svara och avsluta samtalet.", task_en:"Answer and end the call.", example:"Jag är hos dig klockan sex. Vi ses på lördag, hej då!"}],
+ closing:"Ses, hej!"},
+{title:"Det läcker i köket", situation:"Det läcker vatten under diskbänken i din lägenhet. Du ringer fastighetsservicen.", situation_en:"Water is leaking under the kitchen sink in your flat. You call building maintenance.",
+ turns:[
+ {line:"Fastighetsservice, Mikael här.", task:"Presentera dig och berätta om problemet.", task_en:"Introduce yourself and describe the problem.", example:"Hej, jag bor på Strandvägen 5 B 12. Det läcker vatten under diskbänken i köket."},
+ {line:"Hur mycket vatten är det? Droppar det då och då, eller rinner det?", task:"Beskriv situationen.", task_en:"Describe the situation.", example:"Det droppar hela tiden och botten av skåpet är redan blöt. Jag har satt en hink under röret."},
+ {line:"Bra att du satt en hink. Kan du stänga kranen under diskbänken?", task:"Säg att du inte vet hur och be om råd.", task_en:"Say you don't know how and ask for advice.", example:"Jag vet tyvärr inte hur man gör. Kan du förklara var kranen finns?"},
+ {line:"Det finns en liten blå kran på röret, vrid den medsols. Kan någon vara hemma i eftermiddag så att vi kommer in?", task:"Svara nekande och föreslå en lösning.", task_en:"Say no and suggest a solution.", example:"Jag är på jobbet till fem. Men ni får gärna använda er egen nyckel och gå in."},
+ {line:"Det går bra. Har du några husdjur i lägenheten?", task:"Svara.", task_en:"Answer.", example:"Ja, jag har en katt, men hon är snäll. Se bara till att hon inte springer ut."},
+ {line:"Okej, vi är försiktiga. Vi kommer vid två-tiden.", task:"Tacka och avsluta.", task_en:"Thank him and finish.", example:"Tack så mycket, skönt att ni kan komma så snabbt. Hej då!"}],
+ closing:"Hej då!"},
+{title:"Kurs i svenska", situation:"Du ringer till medborgarinstitutet för att anmäla dig till en kurs i svenska.", situation_en:"You call the adult education centre to sign up for a Swedish course.",
+ turns:[
+ {line:"Medborgarinstitutet, god dag.", task:"Berätta varför du ringer.", task_en:"Say why you are calling.", example:"God dag. Jag skulle vilja anmäla mig till en kurs i svenska."},
+ {line:"Gärna. Hur länge har du studerat svenska?", task:"Svara och berätta om din bakgrund.", task_en:"Answer and tell about your background.", example:"Jag läste svenska i skolan i tre år, men jag har glömt mycket. Nu behöver jag svenska i mitt jobb."},
+ {line:"Vi har en kurs på tisdagar klockan fem och en på lördagar på förmiddagen. Vilken passar dig?", task:"Välj och motivera.", task_en:"Choose and give a reason.", example:"Tisdagar passar bättre, för på lördagar är jag ofta med min familj."},
+ {line:"Tisdagskursen är tyvärr redan full. Vill du stå på väntelistan?", task:"Svara jakande och fråga om dina chanser.", task_en:"Say yes and ask about your chances.", example:"Ja, gärna. Hur stor är chansen att jag får en plats?"},
+ {line:"Det brukar alltid finnas några som hoppar av. Kursavgiften är nittio euro. Hur vill du betala?", task:"Svara och fråga om rabatt.", task_en:"Answer and ask about a discount.", example:"Jag betalar helst mot faktura. Finns det någon rabatt för studerande?"},
+ {line:"Ja, studerande får tjugo procents rabatt. Var det något mer?", task:"Tacka och avsluta.", task_en:"Thank her and finish.", example:"Nej, det var allt. Tack för informationen, hej då!"}],
+ closing:"Tack själv, hej då!"},
+{title:"Problem på hotellet", situation:"Du har kommit till ett hotell i Stockholm. Det är något fel på ditt rum.", situation_en:"You have arrived at a hotel in Stockholm. Something is wrong with your room.",
+ turns:[
+ {line:"Välkommen till receptionen. Vad kan jag hjälpa dig med?", task:"Berätta om problemet med rummet.", task_en:"Describe the problem with the room.", example:"Hej, jag bor i rum 214. Tyvärr fungerar inte värmen, och det är väldigt kallt."},
+ {line:"Oj, det beklagar jag. Har du försökt ställa in termostaten?", task:"Svara och förklara vad du har gjort.", task_en:"Answer and explain what you have done.", example:"Ja, jag har vridit den till max, men elementet är fortfarande kallt efter en timme."},
+ {line:"Då ska vi hitta ett annat rum åt dig. Vi har ett rum med utsikt mot gården. Går det bra?", task:"Svara nekande och förklara varför.", task_en:"Say no and explain why.", example:"Helst inte. Jag bokade ett rum med utsikt över vattnet, det var därför jag valde det här hotellet."},
+ {line:"Jag förstår. Det finns ett sådant rum, men det blir ledigt först klockan sex.", task:"Godta förslaget och fråga vad du kan göra så länge.", task_en:"Accept and ask what you can do meanwhile.", example:"Okej, det går bra. Kan jag lämna mitt bagage här så länge?"},
+ {line:"Javisst, vi förvarar det åt dig. Vill du ha tips om vad du kan göra i eftermiddag?", task:"Svara och berätta vad du är intresserad av.", task_en:"Answer and say what you are interested in.", example:"Ja, gärna. Jag är intresserad av historia och vill gärna se ett museum."},
+ {line:"Då rekommenderar jag Vasamuseet. Och som ursäkt bjuder vi på frukost i morgon.", task:"Tacka och avsluta samtalet.", task_en:"Thank them and end the conversation.", example:"Vad generöst, tack så mycket! Då går jag till Vasamuseet. Vi ses senare."}],
+ closing:"Ha en trevlig eftermiddag!"}
+];
+
+const TOPICS = ["vardag och grannar","arbete och kolleger","hälsa och vård","service, köp och reklamation","resor och trafik","boende","fritid och vänner","studier och kurser","myndigheter och ärenden","familj och fester"];
+["vardag och grannar","hälsa och vård","arbete och kolleger","service, köp och reklamation","fritid och vänner","boende","studier och kurser","resor och trafik"].forEach((t, i) => { BANK[i].topic = t; });
+const mk = (topic, title, situation, situation_en, turns, closing) => ({ topic, title, situation, situation_en, closing,
+  turns: turns.map(([line, task, task_en, example]) => ({ line, task, task_en, example })) });
+BANK.push(
+/* vardag och grannar */
+mk("vardag och grannar","Hög musik hos grannen","Det är sent på kvällen och din granne spelar hög musik. Du knackar på hans dörr.","It's late in the evening and your neighbour is playing loud music. You knock on his door.",[
+ ["","Hälsa och förklara varför du kommer.","Greet him and explain why you've come.","Hej, förlåt att jag stör. Jag bor i lägenheten under dig, och musiken hörs väldigt tydligt hos mig."],
+ ["Oj, förlåt! Jag har några vänner på besök. Är det verkligen så högt?","Svara och förklara ditt problem.","Answer and explain your problem.","Ja, tyvärr. Jag måste stiga upp klockan sex i morgon, och jag kan inte sova när det låter så här."],
+ ["Jag förstår. Men det är ju fredag. Kan vi inte spela lite till, till midnatt?","Svara nekande och föreslå en kompromiss.","Say no and suggest a compromise.","Midnatt är för sent för mig. Men om ni sänker volymen ordentligt går det bra att fortsätta till elva."],
+ ["Okej, det låter rättvist. Vill du förresten komma in och ta något att dricka?","Tacka nej artigt och förklara varför.","Politely decline and explain why.","Tack, det är snällt, men jag är verkligen trött. Kanske en annan gång."],
+ ["Synd. Men hör du, vi ska ha fest igen om två veckor. Hur ska vi göra då?","Ge ett förslag.","Make a suggestion.","Du kan sätta upp en lapp i trappan några dagar innan, så vet alla grannar om det i förväg."],
+ ["Bra idé, så gör jag. Och förlåt igen för i kväll.","Svara och avsluta samtalet vänligt.","Answer and end the conversation in a friendly way.","Ingen fara, tack för att du förstår. Ha en trevlig kväll!"]],"Tack, godnatt!"),
+mk("vardag och grannar","Paketet hos grannen","Budet har lämnat ditt paket hos din granne Eva. Du ringer på hennes dörr.","The courier left your parcel with your neighbour Eva. You ring her doorbell.",[
+ ["Hej! Vad kan jag hjälpa dig med?","Presentera dig och berätta varför du kommer.","Introduce yourself and say why you've come.","Hej, jag heter ... och bor på femte våningen. Jag fick en lapp om att mitt paket har lämnats hos dig."],
+ ["Jaså, det är ditt paket! Det kom i går. Det är ganska tungt. Vad finns det i det?","Svara.","Answer.","Det är en ny kaffemaskin som jag beställde på nätet. Jag har väntat på den i två veckor."],
+ ["Vad roligt. Jag har funderat på att köpa en kaffemaskin själv. Är den bra?","Svara och ge ett råd.","Answer and give advice.","Jag har inte testat den än, men den har fått bra recensioner. Läs gärna recensionerna på nätet innan du köper."],
+ ["Det ska jag göra. Behöver du hjälp att bära paketet uppför trappan?","Tacka nej och förklara varför.","Decline and explain why.","Tack, men det behövs inte. Vi har ju hiss, så jag klarar det själv."],
+ ["Okej. Förresten, jag åker bort nästa vecka. Kan du ta hand om min post?","Svara jakande och fråga om detaljer.","Say yes and ask for details.","Ja, gärna. Hur länge är du borta, och var ska jag lägga posten?"],
+ ["En vecka. Du kan lägga posten på mitt köksbord, jag ger dig en extranyckel. Tack så mycket!","Tacka för hjälpen med paketet och avsluta.","Thank her for the parcel help and finish.","Tack själv för att du tog emot paketet. Säg till när du vill ge mig nyckeln. Hej så länge!"]],"Hej hej!"),
+mk("vardag och grannar","Grannens katt","Din granne Johan ska resa bort och ber dig om hjälp med sin katt.","Your neighbour Johan is going away and asks you for help with his cat.",[
+ ["Hej! Jag har en stor tjänst att be om. Har du tid en minut?","Svara och fråga vad det gäller.","Answer and ask what it's about.","Hej Johan! Ja, visst. Vad gäller det?"],
+ ["Jag ska åka till Spanien i tio dagar. Skulle du kunna mata min katt medan jag är borta?","Svara jakande men säg att du inte kan alla dagar.","Say yes, but say you can't do all the days.","Ja, det kan jag göra. Men jag är själv bortrest nästa helg, så de dagarna måste någon annan hjälpa till."],
+ ["Inget problem, min syster kan komma på helgen. Har du haft katt själv?","Svara och berätta om dina erfarenheter av djur.","Answer and tell about your experience with animals.","Ja, när jag var barn hade vi två katter hemma. Så jag vet ungefär hur man sköter dem."],
+ ["Vad bra. Min katt Misse är lite blyg med främlingar. Hur ska vi göra?","Föreslå något.","Suggest something.","Jag kunde komma över i morgon kväll och hälsa på henne, så att hon hinner vänja sig vid mig."],
+ ["Det är en jättebra idé. Jag vill gärna ge dig något som tack. Vad tycker du om?","Säg att det inte behövs.","Say it isn't necessary.","Det behövs verkligen inte. Grannar hjälper varandra. Du kan hjälpa mig någon annan gång."],
+ ["Okej, men jag tar med mig något gott från Spanien i alla fall. Vi ses i morgon då!","Bekräfta tiden och avsluta samtalet.","Confirm the time and end the conversation.","Ja, jag kommer vid sju i morgon kväll. Ha det så bra, hej då!"]],"Hej då, och tack!"),
+mk("vardag och grannar","Städdag på gården","Bostadsbolaget ordnar en gemensam städdag. Ordföranden i husets styrelse ringer dig.","The housing company is organising a joint clean-up day. The chair of the housing board calls you.",[
+ ["Hej, det är Lena från styrelsen. Vi har städdag på lördag. Kommer du?","Svara och fråga vad man ska göra.","Answer and ask what people will do.","Hej! Ja, jag tror att jag kan komma. Vad ska vi göra på städdagen?"],
+ ["Vi krattar löv, tvättar fönstren i trappan och städar cykelförrådet. Vad vill du helst göra?","Välj en uppgift och motivera.","Choose a task and explain why.","Jag tar gärna cykelförrådet. Jag har själv tre cyklar där, så det är bra om det blir lite mer ordning."],
+ ["Toppen. Efteråt grillar vi korv på gården. Kan du ta med något?","Erbjud dig att ta med något.","Offer to bring something.","Ja, jag kan baka en sockerkaka eller ta med saft till barnen."],
+ ["Tack! Men vi har ett problem: vi har för få krattor. Har du någon idé?","Ge ett förslag.","Make a suggestion.","Vi kunde fråga om vi får låna krattor av grannhuset. Eller så kan alla ta med egna verktyg om de har."],
+ ["Bra, jag skriver det i meddelandet till alla. Tror du att din familj också kan komma?","Svara och förklara.","Answer and explain.","Min man kommer gärna, men barnen har fotbollsmatch på förmiddagen. De kan komma till grillningen efteråt."],
+ ["Det låter bra. Vi börjar klockan tio vid porten. Tack för att du ställer upp!","Tacka och avsluta samtalet.","Thank her and end the call.","Tack själv för att du ordnar allt. Vi ses på lördag klockan tio!"]],"Vi ses, hej!"),
+mk("vardag och grannar","Fel bil på min plats","En okänd bil står på din parkeringsplats. Du ser bilens ägare komma ut ur huset.","An unknown car is parked in your parking space. You see the owner come out of the building.",[
+ ["","Tilltala personen och förklara problemet.","Speak to the person and explain the problem.","Ursäkta, är det din bil? Den står på min parkeringsplats, och jag behöver parkera."],
+ ["Oj, förlåt! Jag visste inte att platserna är reserverade. Jag hälsar bara på min mamma.","Svara och förklara reglerna.","Answer and explain the rules.","Det är okej. Alla platser här är reserverade för de boende, men gäster får parkera på gatan bakom huset."],
+ ["Tack för informationen. Jag flyttar bilen genast. Hur kommer jag till den gatan?","Beskriv vägen.","Describe the way.","Kör ut från gården, sväng till vänster och sedan genast till höger. Där finns det gratis platser."],
+ ["Bra. Förresten, min mamma ska snart flytta till ett äldreboende. Vet du något om hur man säljer en lägenhet här?","Säg att du inte vet och ge ett råd.","Say you don't know and give advice.","Tyvärr vet jag inte så mycket om det. Jag rekommenderar att ni kontaktar disponenten, han vet säkert mer."],
+ ["Det gör jag. Hon har bott här i trettio år, så det blir en stor förändring för henne.","Visa förståelse.","Show understanding.","Det förstår jag. Det är säkert tungt att lämna ett hem efter så många år. Hälsa henne från mig."],
+ ["Det ska jag göra. Tack för att du var så förstående, och förlåt för besväret!","Svara och avsluta samtalet.","Answer and end the conversation.","Ingen fara alls. Ha en fin dag!"]],"Detsamma!"),
+/* arbete och kolleger */
+mk("arbete och kolleger","Byta arbetsskift","Din kollega Anders ber dig byta arbetsskift med honom.","Your colleague Anders asks you to swap shifts with him.",[
+ ["Hej, har du en sekund? Jag skulle behöva be dig om en tjänst.","Svara och fråga vad det gäller.","Answer and ask what it's about.","Hej! Javisst, vad gäller det?"],
+ ["Kunde du ta mitt kvällsskift på torsdag? Min dotter har en skolföreställning.","Svara nekande och förklara varför.","Say no and explain why.","Tyvärr går det inte på torsdag. Jag har tandläkartid på kvällen, och den har jag väntat länge på."],
+ ["Jaså, synd. Vet du om någon annan kanske kan?","Föreslå en lösning.","Suggest a solution.","Du kunde fråga Sanna, hon brukar gärna ta extra kvällspass. Eller så kan du prata med chefen."],
+ ["Sanna är sjukledig den här veckan. Har du något annat förslag?","Erbjud din hjälp på ett annat sätt.","Offer your help in another way.","Om någon annan tar ditt skift på torsdag, kan jag ta den personens skift på fredag morgon i stället."],
+ ["Det är en bra idé, då frågar jag Mikko. Måste chefen godkänna bytet?","Svara och förklara.","Answer and explain.","Ja, man måste skicka ett mejl till chefen och berätta vem som byter med vem. Jag kan skicka det om du vill."],
+ ["Tack, det vore snällt! Jag bjuder dig på lunch nästa vecka.","Tacka och avsluta samtalet.","Thank him and end the conversation.","Tack, det låter trevligt! Lycka till med Mikko, och hoppas att föreställningen blir fin."]],"Tack, vi hörs!"),
+mk("arbete och kolleger","Övertid på helgen","Din chef ringer dig på fredag eftermiddag och vill att du jobbar extra.","Your boss calls you on Friday afternoon and wants you to work extra.",[
+ ["Hej, det är Kristina. Du, vi har ett problem. En stor beställning måste vara klar till måndag.","Svara och fråga vad hon vill att du gör.","Answer and ask what she wants you to do.","Hej Kristina. Oj, det låter stressigt. Vad vill du att jag ska göra?"],
+ ["Skulle du kunna jobba några timmar på lördag?","Svara nekande och förklara varför.","Say no and explain why.","Tyvärr, på lördag har jag lovat att hjälpa mina föräldrar att flytta. Det kan jag inte ändra."],
+ ["Jag förstår. Men skulle söndag eftermiddag fungera?","Svara jakande och fråga om ersättning.","Say yes and ask about compensation.","Söndag eftermiddag går bra. Får man övertidsersättning eller ledigt i stället?"],
+ ["Du får dubbel lön för söndagsarbete. Eller vill du hellre ha lediga dagar?","Välj och motivera.","Choose and give a reason.","Jag tar hellre lediga dagar. Jag vill gärna förlänga min sommarsemester lite."],
+ ["Det ordnar vi. Kan du komma klockan tolv?","Föreslå en annan tid.","Suggest another time.","Klockan tolv är lite tidigt för mig. Går det bra om jag kommer klockan ett i stället?"],
+ ["Det går bra. Tack, du räddar verkligen situationen!","Svara och avsluta samtalet.","Answer and end the call.","Det var så lite. Vi ses på söndag då. Trevlig helg!"]],"Detsamma, hej!"),
+mk("arbete och kolleger","Ny kollega","En ny kollega, Sofia, har börjat på din arbetsplats. Hon kommer fram till dig i kafferummet.","A new colleague, Sofia, has started at your workplace. She comes up to you in the coffee room.",[
+ ["Hej! Jag heter Sofia, jag började här i måndags.","Hälsa och presentera dig.","Greet her and introduce yourself.","Hej Sofia, välkommen! Jag heter ... och jobbar på ekonomiavdelningen. Hur har första veckan varit?"],
+ ["Bra, tack, men allt är lite nytt. Hur fungerar det med lunch här? Äter alla tillsammans?","Svara och förklara.","Answer and explain.","De flesta äter i personalmatsalen kring halv tolv. Maten är god och ganska billig. Du kan gärna följa med oss."],
+ ["Gärna! En sak till: jag har inte fått något passerkort än. Vem ska jag kontakta?","Ge ett råd.","Give advice.","Du ska kontakta receptionen på första våningen. De gör korten, men ta med ett id-kort."],
+ ["Tack. Hur länge har du själv jobbat här?","Svara och berätta lite om ditt arbete.","Answer and tell a little about your work.","Jag har jobbat här i fyra år. Jag sköter fakturorna och budgeten, och jag trivs riktigt bra."],
+ ["Vad bra att höra. Finns det några aktiviteter för personalen efter jobbet?","Svara och föreslå att hon deltar i något.","Answer and suggest she join something.","Ja, vi spelar innebandy på torsdagar och har en bokcirkel en gång i månaden. Kom gärna med på innebandy!"],
+ ["Det låter roligt, jag kanske kommer på torsdag. Tack för all information!","Avsluta samtalet vänligt.","End the conversation in a friendly way.","Så lite. Fråga bara om det är något mer. Vi ses på lunchen!"]],"Vi ses!"),
+mk("arbete och kolleger","Telefonintervju","Du har sökt jobb inom kundservice. En rekryterare ringer dig för en kort intervju.","You applied for a customer service job. A recruiter calls you for a short interview.",[
+ ["Hej, det är Marko Virtanen från Nordic Service. Passar det att prata en stund?","Svara jakande.","Say yes.","Hej! Ja, det passar bra. Tack för att du ringer."],
+ ["Bra. Berätta lite om din arbetserfarenhet.","Berätta om din erfarenhet.","Talk about your experience.","Jag har jobbat tre år i en elektronikaffär, där jag hjälpte kunder och skötte reklamationer. Innan dess jobbade jag på ett café."],
+ ["Intressant. Varför vill du jobba just hos oss?","Svara och motivera.","Answer and give reasons.","Jag tycker om att hjälpa människor, och ert företag har ett bra rykte. Dessutom vill jag använda mina språkkunskaper i jobbet."],
+ ["Jobbet innebär också kvällsskift. Hur ställer du dig till det?","Uttryck din åsikt.","Give your opinion.","Det går bra för mig. Jag har inga små barn, så jag är ganska flexibel med arbetstiderna."],
+ ["Har du några frågor om tjänsten?","Ställ en fråga om jobbet.","Ask a question about the job.","Ja, jag undrar hur lång introduktionen är, och om man kan jobba på distans ibland?"],
+ ["Introduktionen är två veckor, och distansarbete är möjligt efter provtiden. Vi hör av oss nästa vecka.","Tacka och avsluta samtalet.","Thank him and end the call.","Tack för informationen och för samtalet. Jag ser fram emot att höra av er. Ha en bra dag!"]],"Detsamma, hej då!"),
+mk("arbete och kolleger","Sjukanmälan","Du har fått feber och kan inte gå till jobbet. Du ringer din chef på morgonen.","You have a fever and can't go to work. You call your boss in the morning.",[
+ ["","Hälsa och berätta varför du ringer.","Greet and say why you're calling.","God morgon, det är ... Jag ringer för att jag är sjuk. Jag har feber och kan inte komma till jobbet i dag."],
+ ["Oj, krya på dig. Hur länge tror du att du blir borta?","Svara.","Answer.","Jag vet inte riktigt, men jag tror att jag är borta åtminstone i två dagar."],
+ ["Okej. Du hade ju ett kundmöte i eftermiddag. Kan någon annan ta det?","Föreslå en lösning.","Suggest a solution.","Ja, Petra känner till kunden ganska bra. Jag kan skicka mina anteckningar till henne."],
+ ["Bra, gör det. Kom ihåg att du behöver ett intyg om du är borta mer än tre dagar.","Svara och fråga om något du är osäker på.","Answer and ask about something you're unsure of.","Okej, det förstår jag. Räcker det med ett intyg från en sjukskötare, eller måste det vara en läkare?"],
+ ["Ett intyg från sjukskötaren räcker för upp till fem dagar. Kan du läsa mejl hemifrån?","Svara nekande och förklara.","Say no and explain.","Helst inte i dag. Jag har huvudvärk och behöver vila. Men jag kan titta på mejlen i morgon om jag mår bättre."],
+ ["Det är helt i sin ordning. Vila nu, och hör av dig i morgon.","Tacka och avsluta samtalet.","Thank her and end the call.","Tack för förståelsen. Jag ringer i morgon förmiddag. Hej då!"]],"Hej då, krya på dig!"),
+/* hälsa och vård */
+mk("hälsa och vård","På apoteket","Du är förkyld och går till apoteket för att köpa medicin.","You have a cold and go to the pharmacy to buy medicine.",[
+ ["Hej, hur kan jag hjälpa?","Beskriv dina symtom.","Describe your symptoms.","Hej, jag är förkyld. Jag har ont i halsen, och näsan har varit täppt sedan i förrgår."],
+ ["Har du feber?","Svara.","Answer.","Lite grann. I morse hade jag trettioåtta grader."],
+ ["Då rekommenderar jag de här tabletterna mot feber och värk, och en nässpray. Använder du andra mediciner?","Svara och berätta om en allergi.","Answer and mention an allergy.","Jag använder inga andra mediciner, men jag är allergisk mot penicillin. Går det bra med de här?"],
+ ["Ja, det går bra. Nässprayen ska du inte använda mer än tio dagar.","Fråga hur du ska ta tabletterna.","Ask how to take the tablets.","Okej. Hur många tabletter ska jag ta per dag, och ska jag ta dem med mat?"],
+ ["En tablett tre gånger om dagen, gärna med mat. Det blir sammanlagt arton euro och femtio cent.","Fråga om det finns ett billigare alternativ.","Ask if there's a cheaper alternative.","Det är ganska dyrt. Finns det något billigare alternativ med samma effekt?"],
+ ["Ja, det här märket kostar bara tolv euro. Det fungerar lika bra.","Bestäm dig och avsluta köpet.","Decide and finish the purchase.","Då tar jag det billigare märket och nässprayen. Jag betalar med kort. Tack för hjälpen!"]],"Varsågod, krya på dig!"),
+mk("hälsa och vård","Avboka tandläkartid","Du har en tid hos tandläkaren i morgon, men du kan inte gå dit. Du ringer tandvården.","You have a dentist appointment tomorrow but you can't go. You call the dental clinic.",[
+ ["Tandvården, det är Heidi.","Berätta varför du ringer.","Say why you're calling.","Hej, jag har en tid i morgon klockan nio, men jag måste tyvärr avboka den."],
+ ["Okej. Vad heter du och vad är ditt födelsedatum?","Svara.","Answer.","Jag heter ... och jag är född den tolfte maj nittonhundraåttiofem."],
+ ["Tack. Om man avbokar mindre än tjugofyra timmar innan, måste man tyvärr betala en avgift.","Förklara varför du avbokar så sent.","Explain why you are cancelling so late.","Det förstår jag, men mitt barn blev sjukt i natt, och jag har ingen som kan ta hand om henne."],
+ ["Jag förstår. Den här gången slipper du avgiften. Vill du boka en ny tid?","Svara jakande och säg när det passar dig.","Say yes and say when it suits you.","Ja, gärna. Helst nästa vecka, på morgonen före klockan tio."],
+ ["Det finns en tid på onsdag klockan åtta, eller på fredag klockan halv tio.","Välj en tid och motivera.","Choose a time and give a reason.","Jag tar onsdag klockan åtta, för då hinner jag till jobbet efteråt."],
+ ["Onsdag klockan åtta, då. Du får en påminnelse per sms dagen innan.","Tacka och avsluta samtalet.","Thank her and end the call.","Tack så mycket, och tack för att jag slapp avgiften. Hej då!"]],"Hej då, och krya på er!"),
+mk("hälsa och vård","Vännen har brutit benet","Din vän Tomas har brutit benet. Du ringer honom.","Your friend Tomas has broken his leg. You call him.",[
+ ["Hej! Vad roligt att du ringer.","Fråga hur han mår.","Ask how he is.","Hej Tomas! Jag hörde att du har brutit benet. Hur mår du?"],
+ ["Jo, det gör ont, men det går framåt. Jag halkade på isen utanför butiken.","Visa medkänsla och fråga hur länge han måste ha gips.","Show sympathy and ask how long he must wear a cast.","Usch, vad tråkigt. Hur länge måste du ha gips?"],
+ ["Sex veckor, tyvärr. Det värsta är att jag inte kan gå och handla själv.","Erbjud din hjälp.","Offer your help.","Jag kan handla åt dig. Skicka bara en lista, så kommer jag förbi efter jobbet."],
+ ["Tack, det vore underbart! Men jag vill inte störa dig för mycket.","Lugna honom.","Reassure him.","Du stör inte alls. Butiken ligger ju på vägen hem, så det är inga problem."],
+ ["Tack. Jag har så tråkigt hemma också. Har du något tips på vad jag kan göra?","Ge ett råd.","Give advice.","Du kunde lyssna på ljudböcker eller börja med en ny tv-serie. Jag kan också låna ut några spel till dig."],
+ ["Bra idé! Kan du ta med några spel när du kommer på onsdag?","Svara och avsluta samtalet.","Answer and end the call.","Ja, självklart. Jag tar med spelen och maten på onsdag. Krya på dig!"]],"Tack, vi ses!"),
+mk("hälsa och vård","Börja motionera","Din vän Linda vill att ni börjar motionera tillsammans.","Your friend Linda wants you both to start exercising together.",[
+ ["Hej! Jag har bestämt mig: jag ska börja motionera. Vill du göra det med mig?","Svara positivt och fråga vad hon har tänkt sig.","Respond positively and ask what she has in mind.","Hej! Vilken bra idé, jag behöver också röra på mig mer. Vad hade du tänkt dig?"],
+ ["Jag tänkte att vi kunde gå på gym tre gånger i veckan.","Säg vad du tycker och föreslå något annat.","Say what you think and suggest something else.","Gym är inte riktigt min grej. Vi kunde i stället simma eller gå stavgång. Det tycker jag är roligare."],
+ ["Simma låter faktiskt trevligt. Simhallen har öppet tidigt på morgnarna. Kan du gå dit före jobbet?","Svara nekande och förklara varför.","Say no and explain why.","Nej, morgnar är svåra för mig. Jag börjar jobbet redan klockan sju, så jag skulle behöva stiga upp jättetidigt."],
+ ["Okej, då tar vi kvällarna. Vilka dagar passar dig bäst?","Svara och motivera.","Answer and give reasons.","Måndag och torsdag passar bäst, för då slutar jag jobbet tidigt."],
+ ["Bra. Simhallen säljer ett säsongskort. Det är lite dyrt, men billigare än att betala varje gång.","Uttryck din åsikt.","Give your opinion.","Jag tycker att vi först ska prova några gånger och köpa kortet sedan, om vi verkligen fortsätter."],
+ ["Det är klokt. Då ses vi vid simhallen på måndag klockan sex?","Bekräfta och avsluta samtalet.","Confirm and end the call.","Ja, måndag klockan sex. Jag ser fram emot det. Hej så länge!"]],"Hej hej!"),
+mk("hälsa och vård","Barnet är sjukt","Ditt barn är sjukt och kan inte gå till daghemmet. Du ringer dit på morgonen.","Your child is ill and can't go to daycare. You call there in the morning.",[
+ ["","Hälsa, presentera dig och berätta varför du ringer.","Greet, introduce yourself and say why you're calling.","God morgon, det är ..., Emils förälder. Emil är sjuk i dag, så han kommer inte till daghemmet."],
+ ["Tack för att du meddelar. Vad är det med honom?","Beskriv barnets symtom.","Describe the child's symptoms.","Han har hosta och lite feber, och han har ingen matlust."],
+ ["Okej. Det är faktiskt flera barn i gruppen som är förkylda. Har han varit sjuk länge?","Svara.","Answer.","Nej, han blev sjuk i går kväll. Han var pigg när jag hämtade honom i går."],
+ ["Kom ihåg att barnet ska vara feberfritt i ett dygn innan han kommer tillbaka.","Fråga om något praktiskt.","Ask about something practical.","Okej. Ni skulle ha utflykt på fredag, eller hur? Vad händer om han inte är frisk då?"],
+ ["Då får han vara hemma. Vi gör fler utflykter i vår, så han missar inte så mycket.","Svara och be dem om något.","Answer and ask them for something.","Det är bra. Kan ni också säga till om fler barn blir sjuka? Hans lillasyster har astma."],
+ ["Självklart, vi informerar alla föräldrar via appen. Krya på er!","Tacka och avsluta samtalet.","Thank them and end the call.","Tack så mycket. Jag ringer igen när han är frisk. Hej då!"]],"Hej då!"),
+/* service, köp och reklamation */
+mk("service, köp och reklamation","Fel storlek på jackan","Du köpte en vinterjacka i går, men den är för liten. Du går tillbaka till butiken.","You bought a winter jacket yesterday, but it is too small. You go back to the shop.",[
+ ["Hej, välkommen! Kan jag hjälpa dig?","Förklara ditt ärende.","Explain your errand.","Hej, jag köpte den här jackan i går, men den är tyvärr för liten. Jag skulle vilja byta den."],
+ ["Inga problem. Har du kvittot med dig?","Svara.","Answer.","Ja, här är kvittot. Jackan är helt oanvänd, lapparna sitter kvar."],
+ ["Tack. Vilken storlek behöver du?","Svara och förklara.","Answer and explain.","Jag behöver en storlek större, alltså large. Den här är för trång i armarna när jag har en tröja under."],
+ ["Tyvärr har vi inte large i blått just nu. Vi har den i svart och grönt.","Säg vad du tycker och fråga om alternativ.","Say what you think and ask about alternatives.","Synd, jag ville helst ha blått. Kan ni beställa en blå i large från en annan butik?"],
+ ["Det kan vi, men det tar ungefär en vecka. Eller så kan du få pengarna tillbaka.","Välj och motivera.","Choose and give reasons.","Jag kan vänta en vecka. Det är inte så kallt än, och jag gillar verkligen den här modellen."],
+ ["Bra, jag beställer den. Vi skickar ett sms när jackan har kommit.","Tacka och avsluta.","Thank them and finish.","Tack för hjälpen! Då väntar jag på ert sms. Hej då!"]],"Hej då, ha en bra dag!"),
+mk("service, köp och reklamation","Fel rätt på restaurangen","Du äter på en restaurang. Du får fel maträtt.","You are eating at a restaurant. You get the wrong dish.",[
+ ["Varsågod, här är er lax med potatismos.","Säg att det är fel rätt.","Say it's the wrong dish.","Ursäkta, men jag beställde inte lax. Jag beställde den vegetariska pastan."],
+ ["Oj, förlåt! Det är mitt fel. Pastan tar tyvärr ungefär femton minuter.","Svara och säg vad du vill göra.","Answer and say what you want to do.","Det går bra, jag kan vänta. Men kan jag få lite bröd under tiden?"],
+ ["Självklart, jag kommer med bröd genast. Vill du ha något mer att dricka?","Beställ något.","Order something.","Ja tack, ett glas mineralvatten, och en kopp grönt te efter maten."],
+ ["Här är pastan, ursäkta väntetiden. Är allt bra med maten?","Svara och klaga artigt på något.","Answer and politely complain about something.","Maten är god, men pastan är lite för salt för min smak."],
+ ["Det beklagar jag, jag ska säga till kocken. Som ursäkt bjuder vi på efterrätt. Vad vill du ha?","Välj en efterrätt eller tacka nej.","Choose a dessert or decline.","Vad snällt! Jag tar gärna en liten skål glass med bär."],
+ ["Kommer genast. Hoppas att du får en trevlig kväll trots allt.","Tacka och avsluta.","Thank them and finish.","Tack, servicen har varit bra trots misstaget. Jag kommer gärna tillbaka."]],"Det gläder mig!"),
+mk("service, köp och reklamation","För hög mobilräkning","Din mobilräkning är mycket högre än vanligt. Du ringer till operatörens kundtjänst.","Your mobile phone bill is much higher than usual. You call the operator's customer service.",[
+ ["Kundtjänst, Jenni här. Vad kan jag hjälpa till med?","Förklara ditt problem.","Explain your problem.","Hej, min senaste räkning är på åttio euro, fast jag normalt betalar tjugo. Jag förstår inte varför."],
+ ["Jag tittar. Det ser ut som om du har använt mobildata utomlands. Har du rest nyligen?","Svara.","Answer.","Ja, jag var i Norge en vecka förra månaden, men jag trodde att data ingick."],
+ ["Norge är tyvärr inte med i EU:s roamingregler, så där kostar det extra.","Säg att du är missnöjd.","Say you are dissatisfied.","Det visste jag inte. Ni borde ha skickat ett meddelande om det när jag kom till Norge."],
+ ["Vi skickade faktiskt ett sms. Men eftersom du är en trogen kund kan jag ge dig femtio procents rabatt.","Tacka och fråga om något för framtiden.","Thank her and ask something about the future.","Tack, det uppskattar jag. Finns det något paket jag kan köpa nästa gång jag reser utanför EU?"],
+ ["Ja, vi har ett resepaket för tio euro per vecka. Det kan du aktivera i appen.","Svara och fråga om betalningen.","Answer and ask about the payment.","Bra, det ska jag komma ihåg. Kan jag betala den här räkningen i två delar?"],
+ ["Ja, det går bra. Jag skickar dig två nya fakturor per e-post.","Tacka och avsluta samtalet.","Thank her and end the call.","Tack så mycket för hjälpen. Ha en bra dag!"]],"Tack detsamma, hej!"),
+mk("service, köp och reklamation","Boka tid hos frisören","Du ringer till en frisersalong för att boka tid.","You call a hair salon to book an appointment.",[
+ ["Salong Saxen, hej!","Berätta vad du vill.","Say what you want.","Hej, jag skulle vilja boka en tid för klippning."],
+ ["Gärna. Vad vill du göra med håret? Bara klippa, eller också färga?","Svara och beskriv vad du vill.","Answer and describe what you want.","Bara klippning. Håret har vuxit mycket, så jag vill ha det kortare, ungefär till axlarna."],
+ ["Okej. Vi har en ledig tid i morgon klockan elva.","Svara nekande och föreslå en annan tid.","Say no and suggest another time.","I morgon förmiddag jobbar jag. Har ni något på kvällen eller på lördag?"],
+ ["På lördag klockan två finns det en tid hos Marja. Hon är vår nyaste frisör.","Svara och fråga om priset.","Answer and ask about the price.","Det passar bra. Vad kostar en klippning?"],
+ ["Det kostar fyrtiofem euro. Studerande och pensionärer får tio procents rabatt.","Svara och fråga om betalningen.","Answer and ask about payment.","Okej. Kan man betala med kort, eller bara kontant?"],
+ ["Man kan betala med kort eller med mobilen. Då ses vi på lördag klockan två!","Bekräfta och avsluta samtalet.","Confirm and end the call.","Bra, lördag klockan två hos Marja. Tack, hej då!"]],"Hej då!"),
+mk("service, köp och reklamation","Paketet har inte kommit","Du beställde skor från en webbutik för två veckor sedan, men paketet har inte kommit. Du ringer kundtjänst.","You ordered shoes from an online shop two weeks ago but the parcel hasn't arrived. You call customer service.",[
+ ["Kundservice, god dag. Vad gäller ditt ärende?","Förklara ditt problem.","Explain your problem.","God dag. Jag beställde ett par skor för två veckor sedan, men jag har fortfarande inte fått paketet."],
+ ["Har du ordernumret?","Svara.","Answer.","Ja, ordernumret är fyrtiotvå sjuttiosex åttio."],
+ ["Tack. Enligt vårt system levererades paketet till en paketautomat förra veckan. Har du fått ett meddelande?","Svara nekande och förklara.","Say no and explain.","Nej, jag har inte fått något meddelande. Kanske har ni fel telefonnummer till mig."],
+ ["Det är möjligt. Paketet skickas tillbaka till oss om det inte hämtas inom två veckor.","Be om hjälp.","Ask for help.","Kan ni skicka koden till mig nu, så att jag hinner hämta paketet innan det skickas tillbaka?"],
+ ["Ja, jag skickar koden till din e-post. Kan jag hjälpa dig med något annat?","Fråga hur du returnerar skorna om de inte passar.","Ask how to return the shoes if they don't fit.","Ja, om skorna inte passar, hur gör jag för att returnera dem? Är returen gratis?"],
+ ["Returen är gratis inom trettio dagar. Det finns en returlapp i paketet.","Tacka och avsluta samtalet.","Thank them and end the call.","Vad bra. Tack för hjälpen, hej då!"]],"Tack själv, hej då!"),
+/* resor och trafik */
+mk("resor och trafik","Tåget är inställt","Ditt tåg till Åbo har blivit inställt. Du går till biljettkontoret på stationen.","Your train to Turku has been cancelled. You go to the ticket office at the station.",[
+ ["Hej, nästa kund, varsågod.","Förklara din situation.","Explain your situation.","Hej, mitt tåg till Åbo klockan tio blev inställt. Vad ska jag göra nu?"],
+ ["Ja, det är ett fel på banan. Nästa tåg går klockan halv ett.","Säg att det är för sent och förklara varför.","Say it's too late and explain why.","Det är för sent för mig. Jag har ett viktigt möte i Åbo klockan tolv."],
+ ["Jag förstår. Det går en ersättningsbuss om tjugo minuter. Den är framme strax före tolv.","Fråga om bussen.","Ask about the bus.","Varifrån går bussen, och gäller min tågbiljett där?"],
+ ["Bussen går från hållplatsen framför stationen, och din biljett gäller.","Fråga om ersättning.","Ask about compensation.","Bra. Kan jag få någon ersättning för förseningen?"],
+ ["Ja, om du är mer än en timme försenad får du tillbaka en del av biljettpriset. Ansökan gör du på vår webbplats.","Svara och be om något skriftligt.","Answer and ask for something in writing.","Okej. Kan jag få ett intyg på att tåget var inställt, ifall jag kommer för sent till mötet?"],
+ ["Javisst, här är ett intyg. Trevlig resa!","Tacka och avsluta.","Thank them and finish.","Tack för hjälpen. Hej då!"]],"Hej då!"),
+mk("resor och trafik","Hyra bil på semestern","Du är på semester i Sverige och vill hyra en bil. Du går till en biluthyrning.","You are on holiday in Sweden and want to rent a car. You go to a car rental office.",[
+ ["Hej och välkommen! Har du bokat bil i förväg?","Svara och berätta vad du vill.","Answer and say what you want.","Hej! Nej, tyvärr inte. Jag skulle vilja hyra en bil i tre dagar."],
+ ["Okej. Vilken sorts bil behöver du?","Beskriv vilken bil du behöver.","Describe the car you need.","En ganska liten bil räcker. Vi är två personer med lite bagage. Den ska helst ha automatväxel."],
+ ["Vi har en liten elbil. Den kostar femtio euro per dag.","Uttryck tvekan och motivera.","Express hesitation and explain why.","Jag är lite osäker på en elbil. Vi ska köra långt upp mot fjällen, och jag vet inte om det finns laddstationer."],
+ ["Det finns gott om laddstationer längs vägen. Annars har vi en bensinbil för sextio euro per dag.","Välj och motivera.","Choose and give a reason.","Då tar jag bensinbilen. Det känns tryggare, fast den är lite dyrare."],
+ ["Bra. Vill du ha en extra försäkring? Den kostar tio euro per dag.","Fråga vad försäkringen täcker.","Ask what the insurance covers.","Vad täcker den extra försäkringen som den vanliga inte gör?"],
+ ["Med den behöver du inte betala något om bilen skadas. Annars är självrisken åttahundra euro.","Bestäm dig och avsluta.","Decide and finish.","Då tar jag den extra försäkringen. Här är mitt körkort och mitt kort."]],"Tack, här är nycklarna. Trevlig resa!"),
+mk("resor och trafik","Vännen besöker Helsingfors","Din vän Karin från Sverige ska besöka Helsingfors. Hon ringer dig för att få tips.","Your friend Karin from Sweden is visiting Helsinki. She calls you for tips.",[
+ ["Hej! Jag kommer till Helsingfors nästa helg. Vad ska jag se?","Ge förslag.","Give suggestions.","Hej Karin! Du måste se Sveaborg och Domkyrkan vid Senatstorget. Och om vädret är fint kan du promenera längs Esplanaden."],
+ ["Låter jättebra. Hur tar jag mig till Sveaborg?","Förklara.","Explain.","Det går en färja från Salutorget ungefär två gånger i timmen. Resan tar en kvart."],
+ ["Perfekt. Och var kan man äta god finsk mat?","Rekommendera ett ställe och motivera.","Recommend a place and give reasons.","Gå till Gamla saluhallen. Där finns laxsoppa och karelska piroger, och det är inte så dyrt."],
+ ["Mums! Förresten, har du tid att träffas på lördag?","Svara jakande och föreslå en plan.","Say yes and suggest a plan.","Ja, gärna! Vi kunde gå på bastu tillsammans på kvällen. Det finns en modern bastu vid havet."],
+ ["Bastu, absolut! Måste man boka i förväg?","Svara och ge ett råd.","Answer and give advice.","Ja, det är bäst att boka på nätet, särskilt på lördagar. Glöm inte att ta med baddräkt."],
+ ["Okej, jag bokar för två. Vad roligt att vi ses snart!","Avsluta samtalet.","End the call.","Ja, verkligen! Trevlig resa, och ring när du har kommit fram."]],"Det gör jag, hej!"),
+mk("resor och trafik","Resväskan kom inte","Du har flugit till Stockholm, men din resväska har inte kommit. Du går till flygplatsens bagageservice.","You have flown to Stockholm, but your suitcase hasn't arrived. You go to the airport baggage service.",[
+ ["Hej, hur kan jag hjälpa dig?","Förklara ditt problem.","Explain your problem.","Hej, jag kom med flyget från Helsingfors för en timme sedan, men min resväska kom aldrig ut på bandet."],
+ ["Det beklagar jag. Kan du beskriva väskan?","Beskriv väskan.","Describe the suitcase.","Det är en stor, mörkblå resväska med hjul. Den har ett gult band runt handtaget."],
+ ["Tack. Vad finns i väskan? Något värdefullt?","Svara.","Answer.","Mest kläder och hygienartiklar. Men också en present till min syster, en dyr glasskål."],
+ ["Väskan kommer troligen med nästa flyg i kväll. Vart ska vi skicka den?","Svara och ge adressen.","Answer and give the address.","Skicka den till min systers adress, Sveavägen 12 i Stockholm. Jag bor hos henne i en vecka."],
+ ["Det gör vi. Om du behöver köpa nödvändiga saker under tiden, kan du få ersättning.","Fråga hur ersättningen fungerar.","Ask how the compensation works.","Vad bra. Hur mycket får man köpa för, och ska jag spara kvittona?"],
+ ["Upp till hundra euro per dag. Spara alla kvitton och skicka dem till oss via webbplatsen.","Tacka och avsluta.","Thank them and finish.","Okej, tack för hjälpen. Jag hoppas att väskan kommer i kväll. Hej då!"]],"Det hoppas vi också. Hej då!"),
+mk("resor och trafik","Taxi till flygplatsen","Du ringer efter en taxi för att åka till flygplatsen tidigt i morgon bitti.","You call for a taxi to go to the airport early tomorrow morning.",[
+ ["Taxicentralen, god kväll.","Berätta vad du vill boka.","Say what you want to book.","God kväll. Jag skulle vilja beställa en taxi till flygplatsen i morgon bitti."],
+ ["Gärna. Vilken tid och från vilken adress?","Svara.","Answer.","Klockan halv fem, från Ågatan 7 i Vasa."],
+ ["Hur många personer är ni, och har ni mycket bagage?","Svara och berätta om något särskilt.","Answer and mention something special.","Vi är tre personer med tre stora väskor. Och vi har ett litet barn, så vi behöver en bilbarnstol."],
+ ["Då skickar vi en större bil med barnstol. Det kostar fem euro extra.","Fråga ungefär vad resan kostar.","Ask roughly how much the trip costs.","Det går bra. Vet du ungefär vad resan till flygplatsen kostar?"],
+ ["Ungefär trettiofem euro, beroende på trafiken. Vi har också ett fast pris på trettio euro om du betalar i förväg.","Välj och motivera.","Choose and give a reason.","Då tar jag det fasta priset. Det är billigare, och då vet jag exakt vad det kostar."],
+ ["Bra. Du får en betalningslänk per sms. Föraren ringer när bilen är framme.","Tacka och avsluta samtalet.","Thank them and end the call.","Utmärkt, tack så mycket. God natt!"]],"God natt!"),
+/* boende */
+mk("boende","Lägenhetsvisning","Du är på visning av en hyreslägenhet. Hyresvärden visar dig runt.","You're viewing a rental flat. The landlord shows you around.",[
+ ["Välkommen! Här är vardagsrummet. Lägenheten är på sextio kvadratmeter. Vad tycker du?","Uttryck din åsikt.","Give your opinion.","Det är ljust och rymligt, och jag tycker om de stora fönstren. Men golvet ser lite slitet ut."],
+ ["Ja, golvet ska bytas i höst. Har du några frågor om lägenheten?","Fråga om hyran.","Ask about the rent.","Ja, hur hög är hyran, och ingår vatten och el?"],
+ ["Hyran är niohundra euro i månaden. Vattnet ingår, men elen betalar du själv.","Fråga om något annat i huset.","Ask about something else in the building.","Okej. Finns det en bastu i huset, och har lägenheten ett eget förråd?"],
+ ["Det finns en gemensam bastu och ett förråd i källaren. Har du husdjur?","Svara.","Answer.","Ja, jag har en liten hund. Hon är lugn och skäller nästan aldrig."],
+ ["Husdjur är tillåtna, men du ansvarar för eventuella skador. När skulle du vilja flytta in?","Svara och motivera.","Answer and give a reason.","Helst den första december, för då slutar mitt nuvarande hyreskontrakt."],
+ ["Det går bra. Flera är intresserade, så jag meddelar mitt beslut på fredag.","Visa intresse och avsluta.","Show interest and finish.","Jag är väldigt intresserad. Jag skickar min ansökan i dag. Tack för visningen!"]],"Tack själv, hej då!"),
+mk("boende","Boka bastutur","Du har just flyttat in i ett höghus. Du vill boka en egen bastutur och ringer disponentbyrån.","You've just moved into a block of flats. You want to book a sauna slot and call the property manager's office.",[
+ ["Disponentbyrån, Sanna här.","Presentera dig och berätta varför du ringer.","Introduce yourself and say why you're calling.","Hej, jag heter ... och flyttade nyss in på Torggatan 4 A. Jag skulle vilja boka en egen bastutur."],
+ ["Välkommen till huset! Vilken veckodag vill du ha?","Svara och motivera.","Answer and give a reason.","Helst onsdag kväll, för då har jag inga andra hobbyer."],
+ ["Onsdagarna är tyvärr fullbokade. Det finns lediga turer på tisdagar och söndagar.","Välj och fråga om tiden.","Choose and ask about the time.","Då tar jag söndag. Vilka tider finns det?"],
+ ["Klockan sju eller klockan åtta på kvällen. En tur är en timme och kostar femton euro i månaden.","Välj en tid och fråga om något praktiskt.","Choose a time and ask something practical.","Jag tar klockan åtta. Hur betalar jag, kommer avgiften med hyran?"],
+ ["Ja, avgiften läggs till på hyresräkningen. Har du fått nyckeln till bastun?","Svara nekande och fråga hur du får den.","Say no and ask how to get it.","Nej, det har jag inte. Var kan jag hämta den?"],
+ ["Din vanliga nyckel går till alla gemensamma utrymmen. Var det något mer?","Tacka och avsluta samtalet.","Thank her and end the call.","Nej, det var allt. Tack för hjälpen och ha en bra dag!"]],"Detsamma, hej!"),
+mk("boende","Flytta ihop med en vän","Din vän Oskar föreslår att ni ska flytta ihop och dela en lägenhet.","Your friend Oskar suggests you move in together and share a flat.",[
+ ["Hej! Jag har en idé. Ska vi hyra en lägenhet tillsammans? Det skulle bli mycket billigare.","Visa intresse men uttryck en tvekan.","Show interest but express a doubt.","Det låter intressant, och billigare vore bra. Men jag är lite orolig att vi skulle bli osams om städningen."],
+ ["Vi kan göra ett städschema. Var skulle du helst vilja bo?","Svara och motivera.","Answer and give a reason.","Gärna nära centrum, för jag cyklar till jobbet och vill inte ha för långt."],
+ ["Jag har sett en trea på Kungsgatan för tolvhundra euro. Det blir sexhundra var.","Uttryck din åsikt.","Give your opinion.","Det är ett bra pris för en trea i centrum. Då skulle vi också ha ett extra rum för gäster."],
+ ["Precis! Men jag spelar ju gitarr varje kväll. Gör det något?","Svara och ställ ett villkor.","Answer and set a condition.","Det gör inget, men inte efter klockan tio på kvällen. Jag måste sova ordentligt."],
+ ["Det är rimligt. Ska vi gå på visningen tillsammans på torsdag?","Svara nekande och föreslå en annan tid.","Say no and suggest another time.","På torsdag har jag kurs. Kan du fråga om vi kan komma på fredag eller lördag i stället?"],
+ ["Jag ringer hyresvärden och frågar. Vad kul, det här blir bra!","Avsluta samtalet positivt.","End the conversation positively.","Ja, det tror jag också. Hör av dig när du har pratat med hyresvärden. Hej så länge!"]],"Hej hej!"),
+mk("boende","Begagnad soffa","Du har sett en annons om en begagnad soffa på nätet. Du ringer säljaren.","You have seen an online ad for a used sofa. You call the seller.",[
+ ["Hallå, det är Ville.","Presentera dig och berätta varför du ringer.","Introduce yourself and say why you're calling.","Hej, jag heter ... Jag ringer om soffan som du säljer på nätet. Finns den kvar?"],
+ ["Ja, den finns kvar. Den är tre år gammal och i fint skick.","Fråga om soffan.","Ask about the sofa.","Vad bra. Hur stor är den, och finns det några fläckar eller skador?"],
+ ["Den är två meter lång. Det finns en liten fläck på ena dynan, men annars är den som ny.","Fråga om priset och försök pruta.","Ask about the price and try to haggle.","Du begär trehundra euro. Skulle du kunna sänka priset lite, med tanke på fläcken?"],
+ ["Jag kan sälja den för tvåhundrafemtio, men inte billigare.","Svara jakande och fråga om transporten.","Say yes and ask about transport.","Okej, det är en affär. Kan du hjälpa till med transporten, eller måste jag hämta soffan själv?"],
+ ["Du måste hämta den själv. Jag bor på tredje våningen, och det finns ingen hiss.","Svara och föreslå en tid.","Answer and suggest a time.","Det går bra, jag tar med en kompis. Kan vi komma på lördag förmiddag, vid elvatiden?"],
+ ["Lördag klockan elva passar bra. Jag skickar adressen per sms.","Bekräfta och avsluta samtalet.","Confirm and end the call.","Tack, då ses vi på lördag klockan elva. Hej då!"]],"Hej då!"),
+mk("boende","Renovera badrummet","Du vill renovera ditt badrum. Du ringer till en byggfirma.","You want to renovate your bathroom. You call a construction company.",[
+ ["Byggservice Nyström, hej!","Berätta vad du vill.","Say what you want.","Hej, jag skulle vilja renovera mitt badrum och undrar om ni kan göra det."],
+ ["Absolut. Vad vill du göra i badrummet?","Beskriv vad du vill göra.","Describe what you want done.","Jag vill byta kakel på väggarna, lägga ett nytt golv och byta ut badkaret mot en dusch."],
+ ["Det låter som ett större jobb. Hur stort är badrummet?","Svara.","Answer.","Det är ganska litet, ungefär fyra kvadratmeter."],
+ ["Okej. Vi kan komma och titta och ge en offert. Det kostar ingenting.","Svara och föreslå en tid.","Answer and suggest a time.","Bra. Kan ni komma nästa måndag efter klockan fyra?"],
+ ["Måndag klockan fem går bra. Men jag måste säga att vi har fullt upp just nu. Vi kan börja först i mars.","Säg att du är besviken och fråga om alternativ.","Say you're disappointed and ask about alternatives.","Det var synd, jag hoppades på januari. Finns det någon möjlighet att börja tidigare om någon avbokar?"],
+ ["Om någon avbokar ringer vi dig först. Vad är ditt namn och telefonnummer?","Svara och avsluta samtalet.","Answer and end the call.","Jag heter ... och mitt nummer är noll fyrtio, ett två tre, fyra fem sex sju. Tack, vi ses på måndag!"]],"Tack, vi ses!"),
+/* fritid och vänner */
+mk("fritid och vänner","Vandring i Lappland","Din vän Elin vill att ni åker på en vandringsresa till Lappland.","Your friend Elin wants you two to go on a hiking trip to Lapland.",[
+ ["Hej! Vad säger du om en vandringsresa till Lappland i augusti?","Svara positivt och fråga om detaljer.","Respond positively and ask for details.","Det låter fantastiskt! Hur länge skulle vi vara borta, och var skulle vi vandra?"],
+ ["En vecka, kanske i Pallas-Ylläs nationalpark. Vi kunde sova i tält.","Uttryck tvekan och föreslå något annat.","Express hesitation and suggest something else.","Jag är inte så van att sova i tält. Kunde vi inte sova i stugor i stället, åtminstone några nätter?"],
+ ["Det finns öppna stugor längs leden. Men vi behöver ändå ta med tält för säkerhets skull.","Håll med och erbjud dig att ordna något.","Agree and offer to arrange something.","Okej, det låter vettigt. Jag kan låna ett tält och ett friluftskök av min bror."],
+ ["Toppen! Hur ska vi ta oss dit? Med tåg eller bil?","Svara och motivera.","Answer and give a reason.","Jag tycker att vi tar nattåget. Det är bekvämt, och vi kan sova under resan."],
+ ["Bra idé. Men jag är lite orolig för myggen i augusti.","Lugna din vän och ge ett råd.","Reassure your friend and give advice.","I slutet av augusti finns det inte så mycket mygg längre. Men vi tar med myggmedel och myggnät."],
+ ["Då bokar jag tågbiljetterna i kväll. Det här blir underbart!","Avsluta samtalet.","End the conversation.","Ja, jag längtar redan! Skicka biljetterna till mig, så betalar jag min del. Hej!"]],"Hej så länge!"),
+mk("fritid och vänner","Middag hos dig","Du har bjudit din kollega Pia på middag. Hon ringer dig dagen innan.","You've invited your colleague Pia to dinner. She calls you the day before.",[
+ ["Hej! Tack igen för inbjudan. Jag ville bara fråga om tiden. När ska jag komma?","Svara.","Answer.","Hej Pia! Kom klockan sex, så hinner vi ta något att dricka innan maten."],
+ ["Bra. En sak till: jag är allergisk mot nötter. Hoppas att det inte är ett problem.","Lugna henne och berätta vad du ska laga.","Reassure her and say what you'll cook.","Inga problem alls. Jag tänkte laga laxsoppa, och det finns inga nötter i den."],
+ ["Mums, det låter gott! Kan jag ta med något?","Svara och föreslå något.","Answer and suggest something.","Du kunde ta med ett bröd eller en efterrätt, om du vill."],
+ ["Jag bakar gärna en äppelkaka. Kommer det fler gäster?","Svara och berätta om de andra gästerna.","Answer and tell about the other guests.","Ja, min granne Tuomas och hans fru kommer också. De är jättetrevliga."],
+ ["Vad roligt! Hur kommer jag enklast till dig? Jag har ingen bil.","Förklara vägen.","Explain the way.","Ta buss nummer fem från centrum och stig av vid biblioteket. Jag bor i det gula huset mittemot."],
+ ["Tack, det hittar jag. Vi ses i morgon!","Avsluta samtalet.","End the call.","Ja, välkommen! Ring om du inte hittar. Hej då!"]],"Hej då!"),
+mk("fritid och vänner","Slutsåld konsert","Din vän Nina ringer. Hon vill gå på en konsert med dig, men det finns ett problem.","Your friend Nina calls. She wants to go to a concert with you, but there's a problem.",[
+ ["Hej! Har du hört att mitt favoritband ska spela i Tammerfors i maj?","Svara och visa entusiasm.","Answer and show enthusiasm.","Nej, det visste jag inte! Vad kul. Ska vi gå tillsammans?"],
+ ["Jag skulle gärna gå med dig, men biljetterna är redan slutsålda.","Visa att du är besviken och ge ett förslag.","Show disappointment and make a suggestion.","Åh, vad synd. Men vi kunde titta om någon säljer sina biljetter på nätet."],
+ ["Det har jag gjort. Någon säljer två biljetter, men för hundrafemtio euro styck.","Uttryck din åsikt om priset.","Give your opinion on the price.","Det är alldeles för dyrt. Det ordinarie priset var väl sextio euro. Så mycket tycker jag inte att vi ska betala."],
+ ["Du har rätt. Men bandet spelar också på en festival i juli. Där finns det fortfarande biljetter.","Fråga mer om festivalen.","Ask more about the festival.","Det låter bättre. Var är festivalen, och vad kostar biljetterna?"],
+ ["I Åbo. En dagsbiljett kostar åttio euro, och då får man se många andra band också.","Bestäm dig och motivera.","Decide and give a reason.","Då köper vi festivalbiljetter. Man får mer för pengarna, och det är roligare att vara utomhus på sommaren."],
+ ["Perfekt, jag köper båda biljetterna i kväll. Du kan betala mig senare.","Tacka och avsluta samtalet.","Thank her and end the call.","Tack, vad snällt! Jag skickar pengarna i morgon. Vi hörs!"]],"Hej då!"),
+mk("fritid och vänner","Bokcirkeln","Din kollega Mats vill att du ska gå med i hans bokcirkel.","Your colleague Mats wants you to join his book club.",[
+ ["Du, vi har en bokcirkel som träffas en gång i månaden. Skulle du vilja vara med?","Visa intresse och fråga om detaljer.","Show interest and ask for details.","Det låter trevligt! Vilka böcker brukar ni läsa?"],
+ ["Mest romaner, ibland deckare. Läser du mycket själv?","Svara och berätta om dina läsvanor.","Answer and tell about your reading habits.","Ja, ganska mycket, särskilt på bussen. Jag gillar deckare och historiska romaner."],
+ ["Vad bra. Nästa gång läser vi en bok på svenska. Klarar du det?","Svara och uttryck en oro.","Answer and express a concern.","Jag tror det, men det tar säkert längre tid för mig. Hur lång är boken?"],
+ ["Ungefär tvåhundra sidor. Vi har en hel månad på oss.","Svara och fråga var ni träffas.","Answer and ask where you meet.","Då hinner jag nog. Var brukar ni träffas?"],
+ ["Hemma hos någon av oss, vi turas om. Nästa gång är det hos mig. Har du boken?","Svara nekande och föreslå en lösning.","Say no and suggest a solution.","Nej, men jag kan låna den på biblioteket eller köpa den som e-bok."],
+ ["Bra. Vi ses hos mig den femtonde klockan sju. Välkommen med!","Tacka och avsluta samtalet.","Thank him and end the conversation.","Tack för inbjudan! Jag ser fram emot det. Vi ses den femtonde."]],"Vi ses!"),
+mk("fritid och vänner","Ny träningstid","Du spelar i ett hobbylag i fotboll. Lagets tränare ringer dig om en ändring.","You play in an amateur football team. The coach calls you about a change.",[
+ ["Hej, det är Jari, tränaren. Jag ringer alla i laget om en ändring.","Svara och fråga vad det gäller.","Answer and ask what it's about.","Hej Jari! Vad har hänt?"],
+ ["Vi får inte använda planen på tisdagar längre. Nu tränar vi på söndag morgon i stället.","Säg att du är missnöjd och förklara varför.","Say you're unhappy and explain why.","Det var tråkigt. Söndag morgon är svårt för mig, för då jobbar jag varannan vecka."],
+ ["Jag förstår, men vi kan tyvärr inte ändra tiden. Vill du ändå vara med de söndagar du är ledig?","Svara jakande och fråga om något.","Say yes and ask about something.","Ja, absolut. Men kan jag fortfarande spela i matcherna fast jag inte tränar varje vecka?"],
+ ["Ja, men du måste träna minst två gånger i månaden. Förresten, vi behöver någon som sköter lagets ekonomi.","Erbjud din hjälp.","Offer your help.","Jag kan gärna sköta ekonomin. Jag jobbar med bokföring, så det är lätt för mig."],
+ ["Vad bra! Du får kassan på söndag. Vet du var den nya planen ligger?","Svara nekande och be om information.","Say no and ask for information.","Nej, tyvärr inte. Kan du skicka adressen till mig?"],
+ ["Jag skickar den i lagets grupp. Tack för att du hjälper till!","Avsluta samtalet.","End the call.","Inga problem. Vi ses på söndag, hej!"]],"Hej då!"),
+/* studier och kurser */
+mk("studier och kurser","Mer tid för essän","Du studerar vid ett universitet. Du kommer inte att hinna lämna in en uppgift i tid och ringer läraren.","You study at a university. You won't manage to hand in an assignment on time and call the teacher.",[
+ ["Hej, det är Helena Berg.","Presentera dig och förklara ditt ärende.","Introduce yourself and explain your errand.","Hej, jag heter ... och går på din kurs i ekonomi. Jag ringer om essän som ska lämnas in på fredag."],
+ ["Ja? Hur går det med den?","Förklara varför du behöver mer tid.","Explain why you need more time.","Inte så bra, tyvärr. Jag har varit sjuk i en vecka, så jag har inte hunnit skriva klart."],
+ ["Det förstår jag. Hur mycket mer tid behöver du?","Svara och motivera.","Answer and give a reason.","Jag skulle behöva en vecka till. Jag har läst all litteratur, men jag måste skriva analysen."],
+ ["En vecka är okej, men då kan du inte få högsta betyg. Det är kursens regel.","Uttryck din åsikt och försök förhandla.","Give your opinion and try to negotiate.","Det tycker jag är lite orättvist, eftersom jag var sjuk. Räcker det om jag skickar ett läkarintyg?"],
+ ["Med ett läkarintyg gäller inte den regeln. Skicka intyget till mig per e-post.","Tacka och fråga om en sak till.","Thank her and ask one more thing.","Tack så mycket! Får jag förresten skicka en del av texten till dig för kommentarer innan?"],
+ ["Ja, men senast på onsdag. Lycka till med skrivandet!","Tacka och avsluta samtalet.","Thank her and end the call.","Tack, då skickar jag den på tisdag. Ha en bra dag!"]],"Detsamma, hej då!"),
+mk("studier och kurser","Försenade lånböcker","Du har fått ett meddelande om att dina lånböcker är försenade. Du går till biblioteket.","You've received a notice that your library books are overdue. You go to the library.",[
+ ["Hej, kan jag hjälpa dig?","Förklara ditt ärende.","Explain your errand.","Hej, jag fick ett meddelande om att mina böcker är försenade. Här är de."],
+ ["Tack. De är tre veckor försenade. Avgiften blir sex euro.","Förklara varför och fråga om avgiften.","Explain why and ask about the fee.","Förlåt, jag var utomlands och glömde förnya lånen. Måste jag betala hela avgiften?"],
+ ["Tyvärr, ja. Men nästa gång kan du förnya lånen på nätet eller i vår app.","Svara och be om hjälp med appen.","Answer and ask for help with the app.","Det visste jag inte. Kan du visa mig hur appen fungerar?"],
+ ["Absolut. Du laddar ner den och loggar in med ditt bibliotekskort. Där kan du också reservera böcker.","Fråga om en bok du vill låna.","Ask about a book you want to borrow.","Bra. Kan du förresten se om ni har den nya romanen som alla pratar om, den av Tove Alsterdal?"],
+ ["Den är tyvärr utlånad, och det finns tio reservationer.","Reagera och be om ett alternativ.","React and ask for an alternative.","Tio! Då får jag vänta länge. Finns den kanske som ljudbok?"],
+ ["Ja, den finns som e-ljudbok, och den är ledig just nu. Du kan låna den i appen.","Tacka och avsluta.","Thank them and finish.","Perfekt, då gör jag det. Tack för hjälpen!"]],"Varsågod, hej då!"),
+mk("studier och kurser","Grupparbetet","Du och din studiekamrat Aleksi ska göra ett grupparbete tillsammans.","You and your fellow student Aleksi are doing a group project together.",[
+ ["Hej! Vi måste börja med grupparbetet. När har du tid att träffas?","Svara och föreslå en tid.","Answer and suggest a time.","Hej! Jag har tid på onsdag eftermiddag eller torsdag förmiddag."],
+ ["Onsdag går bra. Ska vi ses på biblioteket eller på ett café?","Välj och motivera.","Choose and give a reason.","Biblioteket är bättre, för där är det lugnt och vi kan boka ett grupprum."],
+ ["Okej. Hur ska vi dela upp arbetet?","Föreslå hur ni ska dela upp arbetet.","Suggest how to divide the work.","Jag kan skriva teoridelen, och du kan göra intervjuerna. Sedan skriver vi slutsatserna tillsammans."],
+ ["Hmm, jag är inte så bra på att intervjua folk. Kan vi byta?","Svara och föreslå en kompromiss.","Answer and offer a compromise.","Vi kan göra intervjuerna tillsammans i stället. Då kan du ställa frågorna och jag antecknar."],
+ ["Bra idé! Hur många personer ska vi intervjua, tror du?","Svara och motivera.","Answer and give a reason.","Jag tror att fem räcker. Annars hinner vi inte analysera allt före deadline."],
+ ["Okej, fem. Då ses vi på onsdag på biblioteket klockan ett!","Bekräfta och avsluta samtalet.","Confirm and end the conversation.","Ja, jag bokar grupprummet. Vi ses på onsdag!"]],"Ses!"),
+mk("studier och kurser","Bilskolan","Du vill ta körkort och ringer till en bilskola.","You want to get a driving licence and call a driving school.",[
+ ["Bilskolan, god dag.","Berätta vad du vill.","Say what you want.","God dag. Jag vill ta körkort för personbil och undrar hur det fungerar hos er."],
+ ["Först går du på teorilektioner, sedan har du körlektioner. Har du kört bil förut?","Svara.","Answer.","Lite grann. Jag har övat med min pappa på en parkeringsplats några gånger."],
+ ["Bra. Teorilektionerna är på kvällarna, två gånger i veckan. Passar det?","Svara nekande och fråga om alternativ.","Say no and ask about alternatives.","Kvällarna är svåra, för jag jobbar skift. Kan man studera teorin på nätet?"],
+ ["Ja, vi har en nätkurs också. Den kostar lite mindre.","Fråga vad hela körkortet kostar.","Ask what the whole licence costs.","Vad bra. Vad kostar hela körkortet ungefär, med körlektioner och prov?"],
+ ["Ungefär tvåtusen euro, beroende på hur många lektioner du behöver.","Reagera och fråga om betalningssätt.","React and ask about payment options.","Det är mycket pengar. Kan man betala i flera delar?"],
+ ["Ja, du kan dela upp betalningen på sex månader utan extra kostnad. Vill du anmäla dig?","Svara och avsluta samtalet.","Answer and end the call.","Ja, jag vill anmäla mig till nätkursen. Kan du skicka anmälningsblanketten till min e-post? Tack!"]],"Absolut, välkommen!"),
+mk("studier och kurser","Språkcafé","Du ser en affisch om ett språkcafé på svenska. Du ringer arrangören.","You see a poster about a Swedish-language café. You call the organiser.",[
+ ["Hej, det är Malin på Kulturhuset.","Berätta varför du ringer.","Say why you're calling.","Hej, jag såg en affisch om ert språkcafé och vill veta mer om det."],
+ ["Roligt! Vi träffas varje torsdag klockan sex och pratar svenska över en kopp kaffe.","Fråga om det kostar något.","Ask if it costs anything.","Det låter trevligt. Kostar det något att delta?"],
+ ["Det är gratis, men man betalar själv för kaffet. Hur bra kan du svenska?","Svara och beskriv din nivå.","Answer and describe your level.","Ganska bra. Jag förstår det mesta, men jag behöver öva mer på att prata."],
+ ["Då passar du perfekt. Ska jag skriva upp ditt namn för nästa torsdag?","Svara nekande och förklara varför.","Say no and explain why.","Nästa torsdag kan jag tyvärr inte, då är jag på resa. Men veckan därpå kommer jag gärna."],
+ ["Det går bra. Vi söker förresten frivilliga som kan hjälpa till ibland. Är du intresserad?","Svara och motivera.","Answer and give a reason.","Kanske senare. Först vill jag lära känna gruppen och bli säkrare på svenska."],
+ ["Det förstår jag. Välkommen när du har tid!","Tacka och avsluta samtalet.","Thank her and end the call.","Tack så mycket för informationen. Vi ses om två veckor!"]],"Vi ses, hej!"),
+/* myndigheter och ärenden */
+mk("myndigheter och ärenden","Borttappat bankkort","Du har tappat ditt bankkort. Du ringer banken.","You have lost your bank card. You call the bank.",[
+ ["Banken, kundtjänst. Vad kan jag hjälpa till med?","Förklara ditt problem.","Explain your problem.","Hej, jag har tappat mitt bankkort och vill spärra det genast."],
+ ["Okej. När märkte du att kortet var borta?","Svara och berätta vad som hände.","Answer and tell what happened.","För en timme sedan. Jag tror att jag tappade det i mataffären, eller kanske på bussen."],
+ ["Nu har jag spärrat kortet. Har det gjorts några köp som du inte känner igen?","Svara.","Answer.","Jag har kontrollerat i appen, och det ser bra ut. Inga konstiga köp."],
+ ["Bra. Vi skickar ett nytt kort. Det kommer med posten inom en vecka.","Fråga hur du klarar dig utan kort under tiden.","Ask how you manage without a card meanwhile.","En vecka är länge. Hur kan jag betala eller ta ut pengar under tiden?"],
+ ["Du kan betala med mobilen om du lägger till ett virtuellt kort i appen. Och på kontoret kan du ta ut pengar med id-kort.","Be om hjälp med något.","Ask for help with something.","Jag vet inte hur man lägger till ett virtuellt kort. Kan du förklara det?"],
+ ["Du väljer Kort i appen och sedan Lägg till i plånbok. Det tar bara en minut.","Tacka och avsluta.","Thank them and finish.","Det låter enkelt. Tack för hjälpen, hej då!"]],"Hej då!"),
+mk("myndigheter och ärenden","Nytt skattekort","Du har fått ett nytt jobb och behöver ett nytt skattekort. Du ringer Skatteförvaltningen.","You've got a new job and need a new tax card. You call the Tax Administration.",[
+ ["Skatteförvaltningen, god dag.","Förklara ditt ärende.","Explain your errand.","God dag. Jag har fått ett nytt jobb och behöver ett nytt skattekort."],
+ ["Okej. Det enklaste är att göra det i vår e-tjänst. Har du nätbankskoder?","Svara.","Answer.","Ja, det har jag. Men jag försökte i går och förstod inte riktigt hur man gör."],
+ ["Jag kan hjälpa dig. Vet du hur mycket du kommer att tjäna i år?","Svara och förklara din situation.","Answer and explain your situation.","Ungefär. I det gamla jobbet tjänade jag femton tusen, och i det nya tjänar jag kanske tolv tusen till slutet av året."],
+ ["Då blir din inkomst ungefär tjugosjutusen euro. Du får ett nytt skattekort med en ny skatteprocent.","Fråga när du får skattekortet.","Ask when you'll get the tax card.","Bra. När får jag det nya skattekortet? Jag börjar jobba redan nästa vecka."],
+ ["Du ser det direkt i e-tjänsten, och du kan skicka det till din arbetsgivare själv.","Fråga om något annat.","Ask about something else.","Vad bra. En sak till: kan jag dra av resekostnader till jobbet i beskattningen?"],
+ ["Ja, om de är högre än några hundra euro per år. Det gör du i skattedeklarationen.","Tacka och avsluta samtalet.","Thank them and end the call.","Okej, tack för all hjälp. Ha en bra dag!"]],"Detsamma, hej då!"),
+mk("myndigheter och ärenden","Stulen cykel","Din cykel har blivit stulen. Du ringer polisens servicenummer.","Your bicycle has been stolen. You call the police service number.",[
+ ["Polisen, hur kan jag hjälpa?","Berätta vad som har hänt.","Tell what has happened.","Hej, jag vill anmäla att min cykel har blivit stulen."],
+ ["Det är tråkigt. Var och när hände det?","Svara.","Answer.","Utanför järnvägsstationen i dag. Jag lämnade den där klockan åtta, och när jag kom tillbaka klockan fem var den borta."],
+ ["Var cykeln låst?","Svara och förklara.","Answer and explain.","Ja, den var låst med ett lås runt bakhjulet. Men den var inte fastlåst i cykelstället."],
+ ["Kan du beskriva cykeln?","Beskriv cykeln.","Describe the bicycle.","Det är en svart damcykel med en korg på styret. Den är ungefär två år gammal."],
+ ["Tack. Du kan också göra anmälan på nätet. Har du hemförsäkring?","Svara och fråga om något.","Answer and ask about something.","Ja, det har jag. Behöver försäkringsbolaget en kopia av polisanmälan?"],
+ ["Ja, du får ett anmälningsnummer per e-post som du kan ge till försäkringsbolaget.","Tacka och avsluta.","Thank them and finish.","Okej, tack för hjälpen. Jag hoppas att ni hittar cykeln. Hej då!"]],"Hej då!"),
+mk("myndigheter och ärenden","Arbetslös","Du har blivit arbetslös och ringer arbetskraftsbyrån för att få råd.","You've become unemployed and call the employment office for advice.",[
+ ["Arbetskraftsbyrån, Riikka här.","Förklara din situation.","Explain your situation.","Hej, jag har just blivit arbetslös och vill veta hur jag anmäler mig som arbetssökande."],
+ ["Det gör du i vår e-tjänst. Vad har du arbetat med tidigare?","Svara och berätta om din erfarenhet.","Answer and tell about your experience.","Jag har arbetat som lagerarbetare i sex år, men företaget flyttade sin verksamhet till Sverige."],
+ ["Okej. Vill du söka liknande jobb, eller är du intresserad av att byta bransch?","Svara och motivera.","Answer and give reasons.","Jag skulle gärna byta bransch. Jag har alltid varit intresserad av att arbeta med äldre människor."],
+ ["Då kunde du söka till en utbildning för närvårdare. Den tar ungefär två år.","Fråga om ekonomin under utbildningen.","Ask about finances during the training.","Det låter intressant. Kan jag få arbetslöshetsersättning medan jag studerar?"],
+ ["Ja, i vissa fall. Vi går igenom det på ett möte. När skulle du kunna komma hit?","Svara och föreslå en tid.","Answer and suggest a time.","Jag kan komma vilken dag som helst nästa vecka, gärna på förmiddagen."],
+ ["Då bokar jag en tid på tisdag klockan tio. Ta med ditt arbetsintyg.","Bekräfta och avsluta samtalet.","Confirm and end the call.","Tisdag klockan tio, och arbetsintyget. Tack så mycket, hej då!"]],"Hej då!"),
+mk("myndigheter och ärenden","Posten och flytten","Du ska flytta till en annan stad och går till posten för att ordna med din post.","You are moving to another town and go to the post office to sort out your mail.",[
+ ["Hej, vad kan jag göra för dig?","Förklara ditt ärende.","Explain your errand.","Hej, jag flyttar till Uleåborg nästa månad och vill att min post ska komma till den nya adressen."],
+ ["Har du redan gjort en flyttanmälan?","Svara nekande och fråga hur man gör.","Say no and ask how to do it.","Nej, inte än. Hur gör man det?"],
+ ["Det gör du på nätet, och då får också myndigheterna din nya adress automatiskt. Det är gratis.","Svara och fråga om något annat.","Answer and ask about something else.","Bra. Men jag ska bo hos en vän i två veckor innan jag får min lägenhet. Vad gör jag med posten då?"],
+ ["Då kan du beställa en tillfällig eftersändning. Den kostar tjugo euro.","Uttryck din åsikt om priset.","Give your opinion on the price.","Det är lite dyrt för bara två veckor. Finns det något billigare alternativ?"],
+ ["Posten kan också vänta på ditt gamla postkontor, men då måste du hämta den själv.","Välj ett alternativ och motivera.","Choose an option and give a reason.","Då betalar jag för eftersändningen. Det är för långt att åka tillbaka för att hämta posten."],
+ ["Okej, jag gör beställningen nu. Kan jag få se ditt id-kort?","Svara och avsluta.","Answer and finish.","Ja, varsågod, här är mitt pass. Tack för hjälpen!"]],"Tack, lycka till med flytten!"),
+/* familj och fester */
+mk("familj och fester","Kusinens bröllop","Din kusin Emma ringer och bjuder dig på sitt bröllop.","Your cousin Emma calls and invites you to her wedding.",[
+ ["Hej! Jag har stora nyheter. Jag och Daniel ska gifta oss i juni!","Gratulera och fråga mer.","Congratulate and ask more.","Vad underbart, grattis! När och var ska bröllopet vara?"],
+ ["Den tjugonde juni, på en gård i Borgå. Du kommer väl?","Svara nekande och förklara varför.","Say no and explain why.","Åh nej, den tjugonde juni är jag på en arbetsresa i Kanada. Den har varit bokad länge."],
+ ["Vad synd! Kan du inte flytta resan?","Svara och förklara.","Answer and explain.","Tyvärr inte. Det är en stor konferens, och jag ska hålla en presentation."],
+ ["Jag förstår. Men du kan väl komma på möhippan i maj?","Svara jakande och erbjud din hjälp.","Say yes and offer help.","Ja, den kommer jag gärna på! Jag kan hjälpa till att planera den om du vill."],
+ ["Det vore jättebra. Min syster planerar, men hon behöver hjälp. Har du några idéer?","Ge ett förslag.","Make a suggestion.","Vi kunde gå på en danskurs och sedan äta middag på en fin restaurang."],
+ ["Det låter perfekt! Jag ger ditt nummer till min syster.","Avsluta samtalet.","End the call.","Toppen, säg till henne att ringa när som helst. Och grattis igen!"]],"Tack, kram!"),
+mk("familj och fester","Mormor fyller nittio","Din bror ringer. Er mormor fyller nittio år och ni ska planera en present.","Your brother calls. Your grandmother is turning ninety and you need to plan a present.",[
+ ["Hej! Du vet att mormor fyller nittio nästa månad. Vad ska vi ge henne?","Föreslå en present.","Suggest a present.","Hej! Jag tänkte att vi kunde göra ett fotoalbum med gamla bilder från hela hennes liv."],
+ ["Fin idé, men det tar mycket tid. Har du tid att göra det?","Svara och föreslå hur ni delar arbetet.","Answer and suggest how to share the work.","Jag har lite tid på kvällarna. Om du samlar bilderna från släktingarna, så gör jag själva albumet."],
+ ["Okej. Mamma föreslog också att vi ordnar en fest. Vad tycker du?","Uttryck din åsikt.","Give your opinion.","Det är en bra idé, men festen ska inte vara för stor. Mormor blir lätt trött."],
+ ["Du har rätt. Var skulle festen kunna vara?","Ge ett förslag och motivera.","Make a suggestion and give a reason.","Hemma hos mamma, för där finns det plats, och mormor känner sig hemma där."],
+ ["Bra. Men hur ska mormor komma dit? Hon kan inte åka buss längre.","Erbjud din hjälp.","Offer your help.","Jag kan hämta henne med bilen och köra henne hem efteråt."],
+ ["Tack! Då ringer jag mamma och berättar om planen.","Avsluta samtalet.","End the call.","Gör det. Och skicka bilderna till mig så fort du får dem. Hej!"]],"Hej då!"),
+mk("familj och fester","Barnkalaset","Ditt barn fyller sju år. Du planerar kalaset tillsammans med din partner.","Your child is turning seven. You're planning the party together with your partner.",[
+ ["Vi måste bestämma om Leos kalas. Hur många barn ska vi bjuda?","Svara och motivera.","Answer and give a reason.","Jag tycker att vi bjuder hela klassen, så att ingen känner sig utanför."],
+ ["Hela klassen? Det är tjugotvå barn! Var skulle vi ha plats för dem?","Föreslå en plats.","Suggest a place.","Vi kunde hyra föreningshuset, eller ha kalaset i parken om vädret är fint."],
+ ["Parken är riskabelt i maj. Tänk om det regnar?","Håll med och föreslå något annat.","Agree and suggest something else.","Det stämmer. Då hyr vi en lokal. Det finns en lekhall i köpcentret som ordnar kalas."],
+ ["Lekhallen kostar femton euro per barn. Det blir dyrt.","Uttryck din åsikt om kostnaden.","Give your opinion on the cost.","Det är dyrt, men vi slipper städa och planera lekar. Jag tycker att det är värt det."],
+ ["Okej, jag håller med. Men vad ska vi bjuda på? Lekhallen har bara pizza.","Svara och ge ett förslag.","Answer and make a suggestion.","Pizza räcker för barnen. Jag kan baka en tårta hemma och ta med."],
+ ["Perfekt. Kan du ringa lekhallen och boka i morgon?","Svara nekande och föreslå en annan lösning.","Say no and suggest another solution.","I morgon har jag möten hela dagen. Kan du ringa? Jag skriver inbjudningarna i stället."]],"Okej, så gör vi!"),
+mk("familj och fester","Läraren ringer","Ditt barns lärare ringer dig för att prata om hur det går i skolan.","Your child's teacher calls you to talk about how things are going at school.",[
+ ["Hej, det är Anna Holm, Olivers lärare. Har du tid en stund?","Svara och fråga om något har hänt.","Answer and ask if something has happened.","Hej! Ja, jag har tid. Har det hänt något?"],
+ ["Ingenting allvarligt. Men Oliver har varit väldigt trött i skolan den senaste tiden.","Svara och ge en möjlig förklaring.","Answer and give a possible explanation.","Det har jag också märkt. Jag tror att han spelar dataspel för länge på kvällarna."],
+ ["Det kan förklara det. Har ni några regler hemma för skärmtid?","Svara.","Answer.","Inte riktigt, men vi borde ha det. Vad brukar andra föräldrar göra?"],
+ ["Många har en regel om att skärmarna stängs av en timme före läggdags.","Uttryck din åsikt.","Give your opinion.","Det låter bra. Jag tror att det blir svårt i början, men det är nog nödvändigt."],
+ ["Bra. Vi har föräldramöte nästa torsdag. Kan du komma?","Svara nekande och föreslå ett annat sätt.","Say no and suggest another way.","Tyvärr, på torsdag jobbar jag kväll. Men kan jag delta på distans, via video?"],
+ ["Det går bra, jag skickar en länk. Tack för att du tar det här på allvar.","Tacka och avsluta samtalet.","Thank her and end the call.","Tack själv för att du ringde. Vi pratar med Oliver i kväll. Hej då!"]],"Hej då!"),
+mk("familj och fester","Farbror på besök","Din farbror Kalle från Sverige vill komma och hälsa på dig.","Your uncle Kalle from Sweden wants to come and visit you.",[
+ ["Hej, det är farbror Kalle! Jag tänkte komma till Finland i oktober. Kan jag bo hos dig?","Svara jakande och fråga om datumen.","Say yes and ask about the dates.","Hej Kalle! Vad roligt, självklart får du bo hos mig. Vilka datum tänkte du komma?"],
+ ["Från den tionde till den sjuttonde. Har du plats för mig?","Svara och förklara hur det är ordnat.","Answer and explain how it's arranged.","Jag har inget gästrum, men det finns en bekväm bäddsoffa i vardagsrummet."],
+ ["Det går utmärkt. Men jag snarkar ganska högt, ska du veta!","Lugna honom.","Reassure him.","Ingen fara, jag har öronproppar. Och sovrummet har en dörr som går att stänga!"],
+ ["Haha, bra! Vad kan vi hitta på medan jag är där?","Ge förslag.","Give suggestions.","Vi kunde åka till Åbo skärgård, eller gå på ishockeymatch. Du gillar ju hockey."],
+ ["Hockey vore toppen! Kan du köpa biljetter? Jag betalar för dem.","Svara jakande men säg att han inte behöver betala.","Say yes but say he doesn't have to pay.","Javisst, jag köper biljetterna. Men du behöver inte betala, det bjuder jag på."],
+ ["Vad snällt. Då tar jag med något gott från Sverige i stället. Vi hörs!","Avsluta samtalet.","End the call.","Tack, det låter bra. Hör av dig när du har köpt flygbiljetterna. Hej så länge!"]],"Hej då!")
+);
+const PARTNERS = ["en vän","en granne","en arbetskamrat","en chef","en kundtjänstmedarbetare","en receptionist","en släkting","en lärare","en försäljare","en handläggare på en myndighet","en tränare","en hyresvärd"];
+
+/* ---------- Storage helpers ---------- */
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("yki." + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("yki." + k, JSON.stringify(v)); } catch {} }
+};
+
+const $ = s => document.querySelector(s);
+const screens = ["setup","gen","run","review"];
+function show(name) { for (const s of screens) $("#scr-" + s).hidden = s !== name; window.scrollTo(0, 0); }
+function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" })[c]); }
+
+/* ---------- Settings ---------- */
+const S = Object.assign({ topic:"", prep:"30", answer:15, source:"claude", voice:"", rate:0.95, record:true, transcribe:false, readsit:false, showen:false }, store.get("settings", {}));
+S.answer = Math.min(60, Math.max(5, Number(S.answer) || 15));
+function setAnswer(sec) {
+  S.answer = Math.min(60, Math.max(5, Math.round(sec / 5) * 5));
+  $("#answer").value = S.answer;
+  $("#answer-val").textContent = S.answer + " s";
+  $("#ans-live").textContent = S.answer + " s";
+  store.set("settings", S);
+}
+function bindSettings() {
+  setAnswer(S.answer);
+  $("#answer").oninput = e => setAnswer(Number(e.target.value));
+  $("#ans-minus").onclick = () => setAnswer(S.answer - 5);
+  $("#ans-plus").onclick = () => setAnswer(S.answer + 5);
+  $("#source").querySelector('[value="bank"]').textContent = `Färdiga dialoger (${BANK.length})`;
+  for (const k of ["topic","prep","source"]) { $("#" + k).value = S[k]; $("#" + k).onchange = e => { S[k] = e.target.value; store.set("settings", S); }; }
+  for (const k of ["record","transcribe","readsit","showen"]) { $("#" + k).checked = S[k]; $("#" + k).onchange = e => { S[k] = e.target.checked; store.set("settings", S); }; }
+  const r = $("#rate"); r.value = S.rate; $("#rate-val").textContent = Number(S.rate).toFixed(2) + "×";
+  r.oninput = () => { S.rate = Number(r.value); $("#rate-val").textContent = S.rate.toFixed(2) + "×"; store.set("settings", S); };
+  $("#voice").onchange = e => { S.voice = e.target.value; store.set("settings", S); };
+}
+function renderStats() {
+  const n = store.get("count", 0);
+  $("#stats").textContent = n ? `${n} dialog${n === 1 ? "" : "er"} övade` : "";
+}
+
+/* ---------- Speech synthesis ---------- */
+let voices = [];
+function loadVoices() {
+  if (!("speechSynthesis" in window)) { voiceNote("Den här webbläsaren kan inte läsa upp text. Öppna sidan i Edge eller Chrome."); return; }
+  const all = speechSynthesis.getVoices();
+  voices = all.filter(v => /^sv([-_]|$)/i.test(v.lang));
+  const score = v => (/natural|online|neural/i.test(v.name) ? 3 : 0) + (/google/i.test(v.name) ? 2 : 0) + (/sv[-_]SE/i.test(v.lang) ? 1 : 0);
+  voices.sort((a, b) => score(b) - score(a));
+  const sel = $("#voice");
+  sel.innerHTML = voices.length ? "" : '<option value="">Ingen svensk röst hittades</option>';
+  for (const v of voices) { const o = document.createElement("option"); o.value = v.name; o.textContent = `${v.name} (${v.lang})`; sel.append(o); }
+  if (voices.some(v => v.name === S.voice)) sel.value = S.voice; else if (voices[0]) S.voice = voices[0].name;
+  if (all.length && !voices.length) voiceNote("Ingen svensk röst hittades. Dialogen läses då upp med en annan röst. Lägg till svenska under Windows-inställningar → Tid och språk → Tal, eller öppna sidan i Microsoft Edge som har svenska onlineröster.");
+  else voiceNote("");
+}
+function voiceNote(t) { const n = $("#voice-note"); n.textContent = t; n.hidden = !t; }
+function currentVoice() { return voices.find(v => v.name === S.voice) || voices[0] || null; }
+
+function speak(text) {
+  return new Promise(resolve => {
+    if (!text || !("speechSynthesis" in window)) { setTimeout(resolve, text ? 1500 : 0); return; }
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "sv-SE"; u.rate = S.rate;
+    const v = currentVoice(); if (v) u.voice = v;
+    let done = false;
+    const fin = () => { if (done) return; done = true; clearTimeout(guard); clearInterval(keep); resolve(); };
+    u.onend = fin; u.onerror = fin;
+    const guard = setTimeout(fin, 4000 + text.length * 120 / S.rate);
+    // Chrome pauses long utterances; nudging resume keeps them going.
+    const keep = setInterval(() => { if (speechSynthesis.paused) speechSynthesis.resume(); }, 5000);
+    setTimeout(() => speechSynthesis.speak(u), 60);
+  });
+}
+
+// iOS/iPadOS Safari only allows speech that was first started inside a tap; call this from click handlers.
+function unlockAudio() {
+  try { const u = new SpeechSynthesisUtterance(" "); u.volume = 0; speechSynthesis.speak(u); } catch {}
+  beep(1, 1);
+}
+
+/* ---------- Beeps ---------- */
+let actx = null;
+function beep(freq, ms) {
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.frequency.value = freq; o.type = "sine";
+    g.gain.setValueAtTime(0.0001, actx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.18, actx.currentTime + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + ms / 1000);
+    o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime + ms / 1000 + 0.05);
+  } catch {}
+}
+
+/* ---------- Claude (sample capability) ---------- */
+const samplePromise = (window.claude && typeof window.claude.use === "function")
+  ? window.claude.use("sample").catch(() => null) : Promise.resolve(null);
+let sampleBlocked = false;
+let sampleReady = false;
+function updateSourceNote() {
+  const claudeOn = sampleReady && !sampleBlocked && $("#source").value !== "bank";
+  $("#source-note").textContent = claudeOn
+    ? "Claude skriver en ny dialog varje gång. Första gången frågar Claude om lov."
+    : sampleReady && !sampleBlocked
+      ? `Du övar med ${BANK.length} färdiga dialoger. Välj ämne för att öva på ett visst område.`
+      : `Nya dialoger kan inte skapas här, så du övar med ${BANK.length} färdiga dialoger.`;
+}
+samplePromise.then(s => {
+  sampleReady = !!s;
+  const opt = $("#source").querySelector('[value="claude"]');
+  opt.disabled = !s;
+  if (!s) $("#source").value = "bank";
+  updateSourceNote();
+});
+$("#source").addEventListener("change", updateSourceNote);
+
+function buildPrompt() {
+  const topic = S.topic || TOPICS[Math.floor(Math.random() * TOPICS.length)];
+  const partner = PARTNERS[Math.floor(Math.random() * PARTNERS.length)];
+  const recent = store.get("recent", []).slice(-8);
+  const startsWithUser = Math.random() < 0.2;
+  return `You write practice material for the Finnish National Certificate of Language Proficiency (YKI), Swedish, intermediate level (keskitaso / mellannivå, CEFR B1–B2, levels 3–4), speaking section, task type "Dialoger".
+
+Write ONE new dialog. Theme: "${topic}". The candidate talks with ${partner} (give the partner a Swedish or Finland-Swedish first name if natural). Setting: everyday life in Finland (euro, FPA, Finnish towns are fine) or a Swedish-speaking setting.
+${recent.length ? `Avoid repeating these recent situations: ${recent.join("; ")}.` : ""}
+Random seed for variety: ${Math.random().toString(36).slice(2, 8)}.
+
+Exam format rules:
+- "situation": 1–2 sentences in Swedish addressed to the candidate ("Du …"), describing who they talk to and why. Do not reveal the partner's lines.
+- Exactly 6 turns. In each turn the partner says "line" (1–2 natural spoken sentences, max ~25 words, standard Swedish, B1–B2 vocabulary), then the candidate responds following "task".
+- ${startsWithUser ? 'In turn 1 the candidate starts: set "line" to "" and make the task tell them how to open (e.g. "Hälsa och berätta varför du ringer.").' : "The partner speaks first in turn 1."}
+- "task": a short imperative instruction in Swedish, like on the exam. Vary the language functions across the dialog: e.g. "Svara.", "Svara nekande och förklara varför.", "Erbjud din vän hjälp.", "Föreslå något annat.", "Fråga om pris.", "Klaga artigt.", "Be om ursäkt och förklara.", "Ge ett råd.", "Uttryck din åsikt och motivera.", "Håll med.", "Tacka och avsluta samtalet." Use plain "Svara." only when the partner asks a direct question.
+- IMPORTANT: the partner cannot hear the candidate (it is a recording), so every partner line must make sense whatever the candidate reasonably says when following the previous task. The last turn's task ends the conversation.
+- "task_en": English translation of the task.
+- "example": a natural model answer in Swedish at B1–B2 level, 1–3 sentences, that fulfils the task.
+- "closing": one short final partner line after the candidate's last answer (e.g. "Hej då!").
+- "title": a 2–5 word Swedish title. "situation_en": English translation of the situation.
+
+Reply with only JSON in exactly this shape:
+{"title":"...","situation":"...","situation_en":"...","turns":[{"line":"...","task":"...","task_en":"...","example":"..."}],"closing":"..."}`;
+}
+
+function validDialog(d) {
+  return d && typeof d.situation === "string" && Array.isArray(d.turns) && d.turns.length >= 3 &&
+    d.turns.every(t => t && typeof t.task === "string" && typeof (t.line ?? "") === "string");
+}
+
+let genCtl = null, bankInstead = false;
+async function getDialog() {
+  const sample = (sampleBlocked || S.source === "bank") ? null : await samplePromise;
+  if (!sample) return { dialog: pickBank(), note: "" };
+  show("gen");
+  $("#gen-progress").textContent = "Väntar på svar. Det tar oftast 10–40 sekunder.";
+  genCtl = new AbortController();
+  try {
+    const d = await sample.json(buildPrompt(), {
+      cache: false, signal: genCtl.signal,
+      onText: ({ text }) => { $("#gen-progress").textContent = `Skriver… ${text.length} tecken`; }
+    });
+    if (!validDialog(d)) throw { code: "invalid_json" };
+    const recent = store.get("recent", []); recent.push(d.title || d.situation.slice(0, 60)); store.set("recent", recent.slice(-12));
+    return { dialog: d, note: "" };
+  } catch (e) {
+    if (e && e.code === "cancelled") { if (bankInstead) { bankInstead = false; return { dialog: pickBank(), note: "" }; } throw e; }
+    const code = e && e.code;
+    if (["not_granted","sampling_disabled","not_declared","capability_disabled","capability_removed"].includes(code)) sampleBlocked = true;
+    const why = code === "rate_limited" ? "Claude är upptagen just nu." : code === "not_granted" ? "Claude fick inte lov att skriva dialoger." : "Det gick inte att skapa en ny dialog.";
+    return { dialog: pickBank(), note: why + " Du övar med en färdig dialog i stället." };
+  } finally { genCtl = null; }
+}
+// Random pick within the chosen topic, never repeating until every dialog in that pool has been used.
+function pickBank() {
+  let pool = S.topic ? BANK.filter(d => d.topic === S.topic) : BANK;
+  if (!pool.length) pool = BANK;
+  let seen = store.get("bankSeen", []);
+  let fresh = pool.filter(d => !seen.includes(d.title));
+  if (!fresh.length) {
+    const titles = new Set(pool.map(d => d.title));
+    seen = seen.filter(t => !titles.has(t));
+    fresh = pool;
+  }
+  const d = fresh[Math.floor(Math.random() * fresh.length)];
+  seen.push(d.title); store.set("bankSeen", seen);
+  return d;
+}
+
+/* ---------- Mic + recognition ---------- */
+let micStream = null, micTried = false;
+// Asked once per page load; the stream is kept and reused by every later answer and dialog.
+async function ensureMic() {
+  if (!S.record && !S.transcribe) return null;
+  if (micStream) return micStream;
+  if (micTried) return null;
+  micTried = true;
+  try { micStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch { micStream = null; }
+  return micStream;
+}
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+// One recognition session per dialog (each start can trigger a mic prompt on file:// pages).
+// Results are kept only while an answer window is open; it is never restarted mid-dialog.
+let recog = null, recogTurn = -1, recogStarted = false;
+function startRecognition() {
+  if (recogStarted || !S.transcribe || !SR || !micStream) return;
+  recogStarted = true;
+  try {
+    recog = new SR(); recog.lang = "sv-SE"; recog.continuous = true; recog.interimResults = false;
+    recog.onresult = e => {
+      const i = recogTurn; if (i < 0) return;
+      for (let k = e.resultIndex; k < e.results.length; k++)
+        if (e.results[k].isFinal) R.transcripts[i] = ((R.transcripts[i] || "") + " " + e.results[k][0].transcript).trim();
+      const el = document.getElementById("tr-" + i); if (el) el.textContent = "”" + R.transcripts[i] + "”";
+    };
+    recog.onerror = () => {};
+    recog.onend = () => { recog = null; };
+    recog.start();
+  } catch { recog = null; }
+}
+function stopRecognition() {
+  recogTurn = -1; recogStarted = false;
+  const r = recog; recog = null;
+  if (r) { r.onend = null; try { r.stop(); } catch {} }
+}
+
+/* ---------- Run engine ---------- */
+let runId = 0, skipFn = null, current = null;
+const R = { recordings: [], transcripts: [] };
+
+// `seconds` may be a function, so the answer window follows live changes to the answer time.
+function countdown(seconds) {
+  return new Promise(resolve => {
+    const start = performance.now(), secs = () => typeof seconds === "function" ? seconds() : seconds;
+    let t;
+    const finish = () => { clearTimeout(t); skipFn = null; resolve(); };
+    const tick = () => {
+      const total = secs() * 1000, end = start + total;
+      const left = Math.max(0, end - performance.now());
+      const s = Math.ceil(left / 1000);
+      $("#clock").textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+      $("#bar").style.width = (100 * (1 - left / total)) + "%";
+      if (left <= 0) return finish();
+      t = setTimeout(tick, 100);
+    };
+    skipFn = finish; tick();
+  });
+}
+function setPhase(kind, html) {
+  const strip = $("#strip");
+  strip.classList.toggle("answer", kind === "answer");
+  $("#phase-label").innerHTML = html;
+  $("#btn-skip").disabled = kind === "listen";
+  if (kind === "listen") { $("#clock").textContent = ""; $("#bar").style.width = "0"; }
+}
+function markCue(i, state) {
+  [...$("#run-cues").children].forEach((li, k) => {
+    li.classList.toggle("done", k < i);
+    li.classList.toggle("now", k === i);
+    li.classList.toggle("answering", k === i && state === "answer");
+  });
+}
+
+function renderTaskSheet(d) {
+  $("#run-sit").innerHTML = esc(d.situation) + (S.showen && d.situation_en ? `<span class="en">${esc(d.situation_en)}</span>` : "");
+  $("#run-cues").innerHTML = d.turns.map(t =>
+    `<li class="${t.line ? "" : "start"}"><span class="cue">${esc(t.task)}${S.showen && t.task_en ? `<span class="en">${esc(t.task_en)}</span>` : ""}</span></li>`).join("");
+}
+
+async function answerWindow(i, alive) {
+  setPhase("answer", `<span class="dot"></span> Din tur – tala nu`);
+  markCue(i, "answer");
+  beep(880, 160);
+  let rec = null, recDone = Promise.resolve();
+  if (micStream && window.MediaRecorder) {
+    try {
+      const chunks = [];
+      rec = new MediaRecorder(micStream);
+      recDone = new Promise(res => {
+        rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+        rec.onstop = () => { if (chunks.length) R.recordings[i] = URL.createObjectURL(new Blob(chunks, { type: rec.mimeType || "audio/webm" })); res(); };
+      });
+      rec.start();
+    } catch { rec = null; }
+  }
+  startRecognition();
+  recogTurn = i;
+  await countdown(() => S.answer);
+  // Let the last words arrive before closing the window for this turn.
+  setTimeout(() => { if (recogTurn === i) recogTurn = -1; }, 1200);
+  if (rec && rec.state !== "inactive") { rec.stop(); }
+  await Promise.race([recDone, new Promise(r => setTimeout(r, 1500))]);
+  if (alive()) beep(520, 140);
+}
+
+async function runDialog(d) {
+  const id = ++runId, alive = () => id === runId;
+  stopRecognition();
+  current = d; R.recordings = []; R.transcripts = [];
+  renderTaskSheet(d);
+  const mic = await ensureMic();
+  const mn = $("#mic-note");
+  if (S.record && !mic) { mn.textContent = "Mikrofonen är inte tillgänglig här, så svaren spelas inte in. Svara högt ändå inom svarstiden."; mn.hidden = false; }
+  else mn.hidden = true;
+  show("run");
+
+  setPhase("prep", "Läs uppgiften"); markCue(-1);
+  await countdown(Number(S.prep)); if (!alive()) return;
+  if (S.readsit) { setPhase("listen", `<span class="wave"><span></span><span></span><span></span><span></span></span> Situationen läses upp`); await speak(d.situation); if (!alive()) return; await pause(600); }
+
+  for (let i = 0; i < d.turns.length; i++) {
+    const t = d.turns[i];
+    markCue(i, "listen");
+    if (t.line) {
+      setPhase("listen", `<span class="wave"><span></span><span></span><span></span><span></span></span> Lyssna`);
+      await speak(t.line); if (!alive()) return;
+    }
+    await answerWindow(i, alive); if (!alive()) return;
+    await pause(400);
+  }
+  if (d.closing) {
+    markCue(d.turns.length);
+    setPhase("listen", `<span class="wave"><span></span><span></span><span></span><span></span></span> Lyssna`);
+    await speak(d.closing); if (!alive()) return;
+  }
+  setTimeout(stopRecognition, 1500);
+  store.set("count", store.get("count", 0) + 1); renderStats();
+  renderReview(d);
+  show("review");
+}
+const pause = ms => new Promise(r => setTimeout(r, ms));
+
+function abortRun() {
+  runId++;
+  if (skipFn) skipFn();
+  try { speechSynthesis.cancel(); } catch {}
+  stopRecognition();
+  show("setup");
+}
+
+/* ---------- Review ---------- */
+const PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 4V5L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>';
+function renderReview(d) {
+  $("#rev-title").textContent = d.title || "Dialogen";
+  $("#rev-sit").innerHTML = esc(d.situation) + (d.situation_en ? `<span class="en">${esc(d.situation_en)}</span>` : "");
+  const anyRec = R.recordings.some(Boolean);
+  const html = d.turns.map((t, i) => `
+    <div class="turn">
+      ${t.line ? `<div class="line partner"><span class="who">Partner</span><span class="txt">${esc(t.line)}</span><button class="iconbtn" data-say="${i}" aria-label="Lyssna igen">${PLAY}</button></div>` : ""}
+      <div class="line task"><span class="who">Uppgift ${i + 1}</span><span class="txt">${esc(t.task)}${t.task_en ? `<span class="en">${esc(t.task_en)}</span>` : ""}</span><span></span></div>
+      <div class="line mine"><span class="who">Du</span><span class="txt">${
+        R.recordings[i] ? `<audio controls src="${R.recordings[i]}"></audio>` : `<span class="muted small">Ingen inspelning</span>`}
+        <span class="small muted" id="tr-${i}" style="display:block">${R.transcripts[i] ? "”" + esc(R.transcripts[i]) + "”" : ""}</span></span><span></span></div>
+      <div class="line model"><span class="who">Exempel</span><span class="txt">${esc(t.example || "")}</span>${t.example ? `<button class="iconbtn" data-ex="${i}" aria-label="Lyssna på exemplet">${PLAY}</button>` : "<span></span>"}</div>
+    </div>`).join("") + (d.closing ? `<div class="turn"><div class="line partner"><span class="who">Partner</span><span class="txt">${esc(d.closing)}</span><button class="iconbtn" data-close aria-label="Lyssna igen">${PLAY}</button></div></div>` : "");
+  $("#rev-turns").innerHTML = html;
+  $("#rev-note").textContent = anyRec ? "Lyssna på dina svar och jämför med exemplen. Klarade du uppgiften, och lät det naturligt?" : "Jämför det du sa med exemplen. Klarade du varje uppgift?";
+}
+$("#rev-turns").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b || !current) return;
+  if (b.dataset.say != null) speak(current.turns[+b.dataset.say].line);
+  else if (b.dataset.ex != null) speak(current.turns[+b.dataset.ex].example);
+  else if (b.hasAttribute("data-close")) speak(current.closing);
+});
+function dialogText(d) {
+  return [d.title, d.situation, "", ...d.turns.flatMap((t, i) => [
+    t.line ? `Partner: ${t.line}` : null, `Uppgift ${i + 1}: ${t.task}`, `Exempel: ${t.example || ""}`, ""
+  ].filter(x => x !== null)), d.closing ? `Partner: ${d.closing}` : ""].join("\n");
+}
+
+/* ---------- Wiring ---------- */
+let pendingNote = "";
+async function startNew() {
+  $("#btn-start").disabled = true;
+  unlockAudio();
+  try {
+    const { dialog, note } = await getDialog();
+    pendingNote = note;
+    if (note) $("#source-note").textContent = note;
+    await runDialog(dialog);
+  } catch (e) {
+    show("setup");
+  } finally { $("#btn-start").disabled = false; }
+}
+$("#btn-start").onclick = startNew;
+$("#btn-new").onclick = startNew;
+$("#btn-again").onclick = () => { if (current) { unlockAudio(); runDialog(current); } };
+$("#btn-skip").onclick = () => skipFn && skipFn();
+$("#btn-abort").onclick = abortRun;
+$("#btn-gen-cancel").onclick = () => { genCtl && genCtl.abort(); };
+$("#btn-gen-bank").onclick = () => { unlockAudio(); if (genCtl) { bankInstead = true; genCtl.abort(); } };
+$("#btn-testvoice").onclick = () => speak("Hej! Så här låter rösten. Lycka till med provet.");
+$("#btn-copy").onclick = async () => {
+  if (!current) return;
+  const txt = dialogText(current), b = $("#btn-copy");
+  try { await navigator.clipboard.writeText(txt); b.textContent = "Kopierat"; }
+  catch { b.textContent = "Kunde inte kopiera"; }
+  setTimeout(() => (b.textContent = "Kopiera texten"), 1800);
+};
+document.addEventListener("keydown", e => {
+  if (e.key === " " && !$("#scr-run").hidden && skipFn && !/^(BUTTON|INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName || "")) { e.preventDefault(); skipFn(); }
+});
+
+bindSettings(); renderStats();
+loadVoices();
+if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = loadVoices;
+</script>
